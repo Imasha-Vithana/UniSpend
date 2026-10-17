@@ -669,25 +669,92 @@ with chart_right:
         )
 
 
+
 # 10. RECENT TRANSACTIONS
-st.markdown('<div class="section-heading">Recent transactions</div>', unsafe_allow_html=True)
-st.caption("Your saved expenses, newest first.")
+st.markdown(
+    '<div class="section-heading">Recent transactions</div>',
+    unsafe_allow_html=True,
+)
+st.caption("View and filter your saved expenses.")
 
 if not df.empty:
-    display_df = df.sort_values(["date_parsed", "id"], ascending=[False, False]).copy()
-    display_df["Date"] = display_df["date_parsed"].dt.strftime("%d %b %Y")
-    display_df["Amount (LKR)"] = display_df["amount"].map(lambda amount: f"{amount:,.2f}")
-    display_df = display_df[["Date", "name", "category", "Amount (LKR)", "note"]]
-    display_df.columns = ["Date", "Expense", "Category", "Amount (LKR)", "Note"]
-
-    st.dataframe(
-        display_df,
-        hide_index=True,
-        use_container_width=True,
+    available_months = sorted(
+        df["date_parsed"].dt.strftime("%Y-%m").unique(),
+        reverse=True,
     )
+
+    month_options = ["All months"] + available_months
+    category_options = ["All categories"] + sorted(
+        df["category"].dropna().unique().tolist()
+    )
+
+    month_col, category_col = st.columns(2, gap="medium")
+
+    with month_col:
+        selected_month = st.selectbox(
+            "Filter by month",
+            options=month_options,
+            format_func=lambda month: (
+                "All months"
+                if month == "All months"
+                else pd.to_datetime(month).strftime("%B %Y")
+            ),
+            key="transaction_month_filter",
+        )
+
+    with category_col:
+        selected_category = st.selectbox(
+            "Filter by category",
+            options=category_options,
+            key="transaction_category_filter",
+        )
+
+    filtered_df = df.copy()
+
+    if selected_month != "All months":
+        filtered_df = filtered_df[
+            filtered_df["date_parsed"].dt.strftime("%Y-%m")
+            == selected_month
+        ]
+
+    if selected_category != "All categories":
+        filtered_df = filtered_df[
+            filtered_df["category"] == selected_category
+        ]
+
+    st.caption(f"Showing {len(filtered_df)} of {len(df)} transactions.")
+
+    if not filtered_df.empty:
+        display_df = filtered_df.sort_values(
+            ["date_parsed", "id"],
+            ascending=[False, False],
+        ).copy()
+
+        display_df["Date"] = display_df["date_parsed"].dt.strftime(
+            "%d %b %Y"
+        )
+        display_df["Amount (LKR)"] = display_df["amount"].map(
+            lambda amount: f"{amount:,.2f}"
+        )
+
+        display_df = display_df[
+            ["Date", "name", "category", "Amount (LKR)", "note"]
+        ]
+        display_df.columns = [
+            "Date", "Expense", "Category", "Amount (LKR)", "Note"
+        ]
+
+        st.dataframe(
+            display_df,
+            hide_index=True,
+            use_container_width=True,
+        )
+    else:
+        st.info("No expenses match the selected filters.")
 
     with st.expander("Manage transactions"):
         expenses_for_delete = get_expenses()
+
         expense_labels = {
             expense["id"]: (
                 f'{expense["expense_date"]} · {expense["name"]} · '
@@ -701,14 +768,28 @@ if not df.empty:
                 "Select an expense to remove",
                 options=list(expense_labels.keys()),
                 format_func=lambda expense_id: expense_labels[expense_id],
+                key="delete_expense_id",
             )
-            confirm_delete = st.checkbox("I want to delete this transaction.")
 
-            if st.button("Delete selected transaction", disabled=not confirm_delete):
+            confirm_delete = st.checkbox(
+                "I want to delete this transaction.",
+                key="confirm_delete_expense",
+            )
+
+            if st.button(
+                "Delete selected transaction",
+                disabled=not confirm_delete,
+            ):
                 delete_expense(selected_id)
                 st.rerun()
+        else:
+            st.info("There are no transactions to delete.")
+
 else:
-    st.info("No expenses recorded yet. Add your first expense from the sidebar, or load sample transactions to preview the dashboard.")
+    st.info(
+        "No expenses recorded yet. Add your first expense from the sidebar, "
+        "or load sample transactions to preview the dashboard."
+    )
 
 
 # 11. FOOTER

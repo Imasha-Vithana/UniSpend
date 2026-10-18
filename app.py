@@ -1,4 +1,5 @@
 
+
 import sqlite3
 from contextlib import closing
 from datetime import date, timedelta
@@ -700,7 +701,112 @@ with chart_right:
 
 
 
-# 10. RECENT TRANSACTIONS
+# 10. ADVANCED SPENDING ANALYTICS
+st.markdown(
+    '<div class="section-heading">Advanced spending analytics</div>',
+    unsafe_allow_html=True,
+)
+st.caption("Explore monthly trends and identify where your money goes.")
+
+analytics_left, analytics_right = st.columns(2, gap="large")
+
+# MONTHLY SPENDING TREND: current month plus the previous five months.
+with analytics_left:
+    with st.container(border=True):
+        st.subheader("Monthly spending trend")
+        st.caption("Compare your total expenses across the last six months.")
+
+        if not df.empty:
+            monthly_source = df.copy()
+            monthly_source["month"] = monthly_source["date_parsed"].dt.to_period("M")
+            current_period = pd.Period(today, freq="M")
+            periods = pd.period_range(end=current_period, periods=6, freq="M")
+            monthly_totals = (
+                monthly_source.groupby("month")["amount"].sum()
+                .reindex(periods, fill_value=0)
+                .rename_axis("month")
+                .reset_index(name="amount")
+            )
+            monthly_totals["Month"] = monthly_totals["month"].dt.strftime("%b %Y")
+
+            monthly_chart = px.bar(
+                monthly_totals,
+                x="Month",
+                y="amount",
+                labels={"amount": "Total spending (LKR)"},
+                color_discrete_sequence=["#2F6950"],
+            )
+            monthly_chart.update_traces(
+                marker_line_width=0,
+                hovertemplate="%{x}<br>LKR %{y:,.2f}<extra></extra>",
+            )
+            monthly_chart.update_layout(
+                margin=dict(t=20, b=15, l=10, r=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(family="Arial, sans-serif", color="#33483C"),
+                showlegend=False,
+                xaxis=dict(title=None, showgrid=False),
+                yaxis=dict(
+                    title="Total spending (LKR)",
+                    showgrid=True,
+                    gridcolor="#E5ECE6",
+                    rangemode="tozero",
+                ),
+            )
+            st.plotly_chart(
+                monthly_chart,
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+        else:
+            st.info("Add expenses to start comparing monthly spending.")
+
+# QUICK INSIGHTS FOR THE CURRENT MONTH.
+with analytics_right:
+    with st.container(border=True):
+        st.subheader("Your spending insights")
+        st.caption("A quick summary based on this month's recorded expenses.")
+
+        if not current_month_df.empty:
+            category_insights = (
+                current_month_df.groupby("category")["amount"]
+                .sum()
+                .sort_values(ascending=False)
+            )
+            top_category = category_insights.index[0]
+            top_amount = float(category_insights.iloc[0])
+            category_share = (top_amount / total_spent * 100) if total_spent else 0
+
+            insight_col1, insight_col2 = st.columns(2)
+            with insight_col1:
+                st.metric("Highest spending category", top_category)
+                st.caption(f"{currency(top_amount)} · {category_share:.1f}% of this month's spending")
+            with insight_col2:
+                days_elapsed = today.day
+                average_daily = total_spent / days_elapsed if days_elapsed else 0
+                st.metric("Average per day", currency(average_daily))
+                st.caption("Average based on calendar days elapsed this month.")
+
+            st.divider()
+            if monthly_budget > 0:
+                # Use the actual number of days in this calendar month for the estimate.
+                if today.month == 12:
+                    next_month = date(today.year + 1, 1, 1)
+                else:
+                    next_month = date(today.year, today.month + 1, 1)
+                days_in_month = (next_month - date(today.year, today.month, 1)).days
+                projected_spending = average_daily * days_in_month
+                st.write(f"At your current daily average, estimated monthly spending is **{currency(projected_spending)}**.")
+                if projected_spending > monthly_budget:
+                    st.warning("Your current spending pace may exceed your monthly budget.")
+                else:
+                    st.success("Your current spending pace is within your monthly budget.")
+        else:
+            st.info("Add expenses for this month to see personalized spending insights.")
+
+
+# 11. RECENT TRANSACTIONS
 st.markdown(
     '<div class="section-heading">Recent transactions</div>',
     unsafe_allow_html=True,

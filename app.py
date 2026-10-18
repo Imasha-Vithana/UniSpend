@@ -1,3 +1,4 @@
+
 import sqlite3
 from contextlib import closing
 from datetime import date, timedelta
@@ -776,6 +777,30 @@ if not df.empty:
         st.dataframe(
             display_df,
             hide_index=True,
+            use_container_width=True,
+        )
+
+        # Export the currently filtered expenses as a CSV file.
+        export_df = filtered_df[
+            ["expense_date", "name", "category", "amount", "note"]
+        ].copy()
+        export_df = export_df.rename(
+            columns={
+                "expense_date": "Date",
+                "name": "Expense",
+                "category": "Category",
+                "amount": "Amount (LKR)",
+                "note": "Note",
+            }
+        )
+        csv_data = export_df.to_csv(index=False).encode("utf-8-sig")
+
+        st.download_button(
+            label="Download filtered expenses (CSV)",
+            data=csv_data,
+            file_name="unispends_expenses.csv",
+            mime="text/csv",
+            key="download_filtered_expenses",
             use_container_width=True,
         )
     else:

@@ -134,6 +134,35 @@ def add_expense(name, category, amount, expense_date, note):
         )
         conn.commit()
 
+def update_expense(
+    expense_id,
+    name,
+    amount,
+    category,
+    expense_date,
+    note,
+):
+    with closing(sqlite3.connect(DB_PATH)) as conn:
+        conn.execute(
+            """
+            UPDATE expenses
+            SET name = ?,
+                amount = ?,
+                category = ?,
+                expense_date = ?,
+                note = ?
+            WHERE id = ?
+            """,
+            (
+                name,
+                amount,
+                category,
+                expense_date,
+                note,
+                expense_id,
+            ),
+        )
+        conn.commit()
 
 def delete_expense(expense_id):
     """Delete an expense using its ID."""
@@ -751,6 +780,107 @@ if not df.empty:
         )
     else:
         st.info("No expenses match the selected filters.")
+
+        # Edit an existing expense
+    with st.expander("Edit a transaction"):
+        expenses_for_edit = get_expenses()
+
+        edit_labels = {
+            expense["id"]: (
+                f'{expense["expense_date"]} · {expense["name"]} · '
+                f'LKR {expense["amount"]:,.2f}'
+            )
+            for expense in expenses_for_edit
+        }
+
+        if edit_labels:
+            selected_edit_id = st.selectbox(
+                "Select an expense to edit",
+                options=list(edit_labels.keys()),
+                format_func=lambda expense_id: edit_labels[expense_id],
+                key="edit_expense_id",
+            )
+
+            selected_expense = next(
+                expense
+                for expense in expenses_for_edit
+                if expense["id"] == selected_edit_id
+            )
+
+            edit_categories = [
+                "Food & Drinks",
+                "Transport",
+                "Education",
+                "Data & Internet",
+                "Personal Care",
+                "Shopping",
+                "Bills",
+                "Other",
+            ]
+
+            if selected_expense["category"] not in edit_categories:
+                edit_categories.insert(
+                    0,
+                    selected_expense["category"],
+                )
+
+            with st.form(f"edit_expense_form_{selected_edit_id}"):
+                edited_name = st.text_input(
+                    "Expense name",
+                    value=selected_expense["name"],
+                    key=f"edit_name_{selected_edit_id}",
+                )
+
+                edited_amount = st.number_input(
+                    "Amount (LKR)",
+                    min_value=0.01,
+                    value=float(selected_expense["amount"]),
+                    step=50.0,
+                    key=f"edit_amount_{selected_edit_id}",
+                )
+
+                edited_category = st.selectbox(
+                    "Category",
+                    options=edit_categories,
+                    index=edit_categories.index(
+                        selected_expense["category"]
+                    ),
+                    key=f"edit_category_{selected_edit_id}",
+                )
+
+                edited_date = st.date_input(
+                    "Expense date",
+                    value=date.fromisoformat(
+                        selected_expense["expense_date"]
+                    ),
+                    key=f"edit_date_{selected_edit_id}",
+                )
+
+                edited_note = st.text_input(
+                    "Note",
+                    value=selected_expense.get("note") or "",
+                    key=f"edit_note_{selected_edit_id}",
+                )
+
+                save_edit = st.form_submit_button("Save changes")
+
+            if save_edit:
+                if not edited_name.strip():
+                    st.error("Expense name cannot be empty.")
+                else:
+                    update_expense(
+                        selected_edit_id,
+                        edited_name.strip(),
+                        float(edited_amount),
+                        edited_category,
+                        edited_date.isoformat(),
+                        edited_note.strip(),
+                    )
+                    st.success("Expense updated successfully!")
+                    st.rerun()
+
+        else:
+            st.info("There are no transactions to edit.")
 
     with st.expander("Manage transactions"):
         expenses_for_delete = get_expenses()

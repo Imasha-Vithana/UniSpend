@@ -1,22 +1,26 @@
 
-
 import sqlite3
 from contextlib import closing
 from datetime import date, timedelta
+from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import math
 
 
-# 1. PAGE CONFIGURATION
+# =========================================================
+# 1. CONFIGURATION
+# =========================================================
+
 st.set_page_config(
     page_title="UniSpend | Student Finance",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-DB_PATH = "unispends.db"
+DB_PATH = Path(__file__).resolve().parent / "unispends.db"
 
 CATEGORIES = [
     "Food & Drinks",
@@ -29,364 +33,1050 @@ CATEGORIES = [
     "Other",
 ]
 
-# Professional forest-green and sage palette
 CHART_COLORS = [
     "#24563D",
-    "#4E8065",
-    "#87A891",
-    "#C4D5C5",
-    "#B6A27A",
-    "#7E9BA0",
-    "#A7B3A8",
-    "#6D806F",
+    "#6B9B78",
+    "#A6C4A8",
+    "#D3A76C",
+    "#7696A5",
+    "#B7A1C7",
+    "#D98C79",
+    "#87958B",
 ]
 
-# 2. DATABASE FUNCTIONS
-def init_database():
-    """Create the database tables if they do not exist."""
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS expenses (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                category TEXT NOT NULL,
-                amount REAL NOT NULL CHECK(amount > 0),
-                expense_date TEXT NOT NULL,
-                note TEXT DEFAULT ''
-            )
-            """
-        )
-
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS settings (
-                setting_key TEXT PRIMARY KEY,
-                setting_value TEXT NOT NULL
-            )
-            """
-        )
-
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO settings (setting_key, setting_value)
-            VALUES (?, ?)
-            """,
-            ("monthly_budget", "15000"),
-        )
-        conn.commit()
+FOREST = "#18392B"
+GREEN = "#24563D"
+TEXT = "#24382D"
+MUTED = "#607366"
+BORDER = "#DCE6DE"
 
 
-def get_monthly_budget():
-    """Return the saved monthly budget."""
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        result = conn.execute(
-            "SELECT setting_value FROM settings WHERE setting_key = ?",
-            ("monthly_budget",),
-        ).fetchone()
 
-    return int(result[0]) if result else 15000
+# =========================================================
+# 2. CUSTOM CSS — UNISPEND PROFESSIONAL THEME
+# =========================================================
 
-
-def save_monthly_budget(amount):
-    """Save the monthly budget."""
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        conn.execute(
-            """
-            INSERT INTO settings (setting_key, setting_value)
-            VALUES (?, ?)
-            ON CONFLICT(setting_key)
-            DO UPDATE SET setting_value = excluded.setting_value
-            """,
-            ("monthly_budget", str(amount)),
-        )
-        conn.commit()
-
-
-def get_expenses():
-    """Return all saved expenses, newest first."""
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        conn.row_factory = sqlite3.Row
-        records = conn.execute(
-            """
-            SELECT id, name, category, amount, expense_date, note
-            FROM expenses
-            ORDER BY expense_date DESC, id DESC
-            """
-        ).fetchall()
-
-    return [dict(record) for record in records]
-
-
-def add_expense(name, category, amount, expense_date, note):
-    """Save a new expense."""
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        conn.execute(
-            """
-            INSERT INTO expenses (name, category, amount, expense_date, note)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (
-                name.strip(),
-                category,
-                float(amount),
-                expense_date.isoformat(),
-                note.strip(),
-            ),
-        )
-        conn.commit()
-
-def update_expense(
-    expense_id,
-    name,
-    amount,
-    category,
-    expense_date,
-    note,
-):
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        conn.execute(
-            """
-            UPDATE expenses
-            SET name = ?,
-                amount = ?,
-                category = ?,
-                expense_date = ?,
-                note = ?
-            WHERE id = ?
-            """,
-            (
-                name,
-                amount,
-                category,
-                expense_date,
-                note,
-                expense_id,
-            ),
-        )
-        conn.commit()
-
-def delete_expense(expense_id):
-    """Delete an expense using its ID."""
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        conn.execute("DELETE FROM expenses WHERE id = ?", (int(expense_id),))
-        conn.commit()
-
-
-def load_demo_data():
-    """Add example expenses to help preview the dashboard."""
-    today = date.today()
-    demo_expenses = [
-        ("Campus lunch", "Food & Drinks", 450, today.isoformat(), "Lunch between lectures"),
-        ("Bus fare", "Transport", 180, (today - timedelta(days=1)).isoformat(), "Travel to campus"),
-        ("Mobile data", "Data & Internet", 399, (today - timedelta(days=2)).isoformat(), "Data package"),
-        ("Printed notes", "Education", 250, (today - timedelta(days=3)).isoformat(), "Study materials"),
-        ("Coffee", "Food & Drinks", 350, (today - timedelta(days=4)).isoformat(), "Coffee break"),
-        ("Personal items", "Personal Care", 750, (today - timedelta(days=5)).isoformat(), "Essential items"),
-    ]
-
-    with closing(sqlite3.connect(DB_PATH)) as conn:
-        for item in demo_expenses:
-            # Avoid inserting the same sample transaction repeatedly.
-            existing = conn.execute(
-                """
-                SELECT 1 FROM expenses
-                WHERE name = ? AND category = ? AND expense_date = ? AND note = ?
-                LIMIT 1
-                """,
-                (item[0], item[1], item[3], item[4]),
-            ).fetchone()
-            if not existing:
-                conn.execute(
-                    """
-                    INSERT INTO expenses (name, category, amount, expense_date, note)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    item,
-                )
-        conn.commit()
-
-
-# Make sure the required database tables exist before loading the app.
-init_database()
-
-
-# 3. PROFESSIONAL GREEN DESIGN
 st.markdown(
     """
     <style>
-        .stApp {
-            background-color: #F3F6F3;
-        }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
-        [data-testid="stHeader"] {
-            background-color: rgba(243, 246, 243, 0.96);
-        }
+    :root {
+        --forest: #173D2B;
+        --forest-hover: #214F38;
+        --green: #2E6848;
+        --sage: #E7EFE7;
+        --page: #F5F7F4;
+        --card: #FFFFFF;
+        --text: #25372D;
+        --muted: #66766B;
+        --border: #DCE5DD;
+        --input-bg: #FFFFFF;
+        --shadow: 0 4px 18px rgba(23, 61, 43, 0.055);
+    }
 
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-            max-width: 1500px;
-        }
+    /* ---------- GLOBAL ---------- */
 
-        section[data-testid="stSidebar"] {
-            background-color: #18392B;
-        }
+    html, body, [class*="css"] {
+        font-family: 'DM Sans', sans-serif;
+    }
 
-        section[data-testid="stSidebar"] h1,
-        section[data-testid="stSidebar"] h2,
-        section[data-testid="stSidebar"] h3,
-        section[data-testid="stSidebar"] p,
-        section[data-testid="stSidebar"] label,
-        section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
-            color: #EDF3EE;
+    .stApp {
+        background: var(--page) !important;
+        color: var(--text) !important;
+    }
+
+    [data-testid="stAppViewContainer"] {
+        background: var(--page) !important;
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(245, 247, 244, 0.98) !important;
+    }
+
+    [data-testid="stAppViewContainer"] .main .block-container {
+        max-width: 1450px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
+
+    /* ---------- READABLE TEXT ---------- */
+
+    .main h1,
+    .main h2,
+    .main h3,
+    .main h4 {
+        color: var(--forest) !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-weight: 800 !important;
+    }
+
+    .main p,
+    .main li,
+    .main label,
+    .main [data-testid="stMarkdownContainer"] p {
+        color: var(--text);
+    }
+
+    [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] p {
+        color: var(--muted) !important;
+        -webkit-text-fill-color: var(--muted) !important;
+    }
+
+    /* ---------- HERO ---------- */
+
+    .hero {
+        background: linear-gradient(
+            120deg,
+            #173D2B 0%,
+            #24563D 60%,
+            #397451 100%
+        ) !important;
+        padding: 38px;
+        border-radius: 22px;
+        margin-bottom: 28px;
+        box-shadow: 0 12px 30px rgba(23, 61, 43, 0.13);
+    }
+
+    .hero .eyebrow {
+        color: #D7E8DA !important;
+        -webkit-text-fill-color: #D7E8DA !important;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+
+    .hero h1 {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-size: clamp(28px, 3vw, 43px);
+        line-height: 1.2;
+        margin: 0 0 14px 0;
+    }
+
+    .hero p {
+        color: #EDF4EE !important;
+        -webkit-text-fill-color: #EDF4EE !important;
+        font-size: 15px;
+        line-height: 1.8;
+        max-width: 700px;
+    }
+
+    /* ---------- SECTION HEADINGS ---------- */
+
+    .section-heading {
+        color: var(--forest) !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-size: 22px;
+        font-weight: 800;
+        margin: 30px 0 5px 0;
+    }
+
+    .section-subtitle {
+        color: var(--muted) !important;
+        font-size: 13px;
+        line-height: 1.7;
+        margin-bottom: 18px;
+    }
+
+    /* ---------- CUSTOM DASHBOARD CARDS ---------- */
+
+    .metric-card,
+    .panel {
+        background: var(--card) !important;
+        color: var(--text) !important;
+        border: 1px solid var(--border);
+        border-radius: 17px;
+        box-shadow: var(--shadow);
+    }
+
+    .metric-card {
+        padding: 22px;
+        min-height: 140px;
+    }
+
+    .metric-label {
+        color: var(--muted) !important;
+        -webkit-text-fill-color: var(--muted) !important;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        margin-bottom: 13px;
+    }
+
+    .metric-value {
+        color: var(--forest) !important;
+        -webkit-text-fill-color: var(--forest) !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-size: clamp(22px, 2vw, 30px);
+        font-weight: 800;
+        line-height: 1.3;
+        overflow-wrap: anywhere;
+    }
+
+    .metric-note {
+        color: var(--muted) !important;
+        -webkit-text-fill-color: var(--muted) !important;
+        font-size: 12px;
+        margin-top: 9px;
+    }
+
+    .panel {
+        padding: 23px;
+        margin-bottom: 18px;
+    }
+
+    /* ---------- STREAMLIT METRICS ---------- */
+
+    [data-testid="stMetric"] {
+        background: #FFFFFF !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 13px !important;
+        padding: 15px 17px !important;
+    }
+
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricLabel"] p {
+        color: var(--muted) !important;
+        -webkit-text-fill-color: var(--muted) !important;
+    }
+
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricValue"] div {
+        color: var(--forest) !important;
+        -webkit-text-fill-color: var(--forest) !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-weight: 800 !important;
+    }
+
+    [data-testid="stMetricDelta"] {
+        font-weight: 600;
+    }
+
+    /* ---------- FORMS ---------- */
+
+    [data-testid="stForm"] {
+        background: #FFFFFF !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 17px !important;
+        padding: 23px !important;
+        box-shadow: var(--shadow);
+    }
+
+    [data-testid="stWidgetLabel"] p,
+    [data-testid="stWidgetLabel"] label,
+    [data-testid="stWidgetLabel"] {
+        color: var(--text) !important;
+        -webkit-text-fill-color: var(--text) !important;
+        font-weight: 600 !important;
+    }
+
+    /* ---------- INPUTS ---------- */
+
+    .stApp input,
+    .stApp textarea {
+        background: #FFFFFF !important;
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+        caret-color: #24563D !important;
+        border-radius: 9px !important;
+    }
+
+    .stApp input::placeholder,
+    .stApp textarea::placeholder {
+        color: #7A897E !important;
+        -webkit-text-fill-color: #7A897E !important;
+        opacity: 1 !important;
+    }
+
+    .stApp [data-baseweb="input"],
+    .stApp [data-baseweb="textarea"] {
+        background: #FFFFFF !important;
+        border-color: #CAD8CC !important;
+        border-radius: 9px !important;
+    }
+
+    .stApp [data-baseweb="input"]:focus-within,
+    .stApp [data-baseweb="textarea"]:focus-within {
+        border-color: #397451 !important;
+        box-shadow: 0 0 0 1px #397451 !important;
+    }
+
+    /* ---------- SELECT BOXES ---------- */
+
+    .stApp [data-baseweb="select"] > div {
+        background: #FFFFFF !important;
+        border-color: #CAD8CC !important;
+        border-radius: 9px !important;
+    }
+
+    .stApp [data-baseweb="select"] input,
+    .stApp [data-baseweb="select"] div,
+    .stApp [data-baseweb="select"] span {
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+    }
+
+    [data-baseweb="popover"],
+    [data-baseweb="menu"],
+    [role="listbox"] {
+        background: #FFFFFF !important;
+        color: #25372D !important;
+    }
+
+    [role="option"] {
+        background: #FFFFFF !important;
+        color: #25372D !important;
+    }
+
+    [role="option"]:hover {
+        background: #E7EFE7 !important;
+    }
+
+    /* ---------- DATE PICKER ---------- */
+
+    [data-baseweb="calendar"],
+    [data-baseweb="calendar"] * {
+        color: #25372D !important;
+    }
+
+    [data-baseweb="calendar"] {
+        background: #FFFFFF !important;
+    }
+
+    /* ---------- BUTTONS ---------- */
+
+    .stButton > button,
+    .stFormSubmitButton > button,
+    [data-testid="stDownloadButton"] > button {
+        background: #24563D !important;
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        border: 1px solid #24563D !important;
+        border-radius: 10px !important;
+        min-height: 42px;
+        font-weight: 700 !important;
+        box-shadow: none !important;
+        transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .stButton > button p,
+    .stFormSubmitButton > button p,
+    [data-testid="stDownloadButton"] > button p,
+    .stButton > button span,
+    .stFormSubmitButton > button span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 700 !important;
+    }
+
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover,
+    [data-testid="stDownloadButton"] > button:hover {
+        background: #173D2B !important;
+        border-color: #173D2B !important;
+    }
+
+    .stButton > button:disabled,
+    .stFormSubmitButton > button:disabled {
+        background: #E1E8E1 !important;
+        color: #66766B !important;
+        -webkit-text-fill-color: #66766B !important;
+        border-color: #E1E8E1 !important;
+    }
+
+    /* ---------- CHECKBOXES & RADIO BUTTONS ---------- */
+
+    [data-testid="stCheckbox"] label,
+    [data-testid="stRadio"] label {
+        color: var(--text) !important;
+        -webkit-text-fill-color: var(--text) !important;
+    }
+
+    [data-testid="stCheckbox"] p,
+    [data-testid="stRadio"] p {
+        color: var(--text) !important;
+        -webkit-text-fill-color: var(--text) !important;
+    }
+
+    /* ---------- EXPANDERS ---------- */
+
+    [data-testid="stExpander"] {
+        background: #FFFFFF !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 13px !important;
+        overflow: hidden;
+    }
+
+    [data-testid="stExpander"] summary {
+        background: #FFFFFF !important;
+        color: var(--forest) !important;
+        font-weight: 700 !important;
+    }
+
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary p {
+        color: var(--forest) !important;
+        -webkit-text-fill-color: var(--forest) !important;
+    }
+
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
+        color: var(--text) !important;
+    }
+
+    /* ---------- PROGRESS BARS ---------- */
+
+    .stProgress > div {
+        background: #E5ECE5 !important;
+        border-radius: 99px !important;
+    }
+
+    .stProgress > div > div > div > div {
+        background: #397451 !important;
+        border-radius: 99px !important;
+    }
+
+    /* ---------- DATA TABLES ---------- */
+
+    [data-testid="stDataFrame"],
+    [data-testid="stTable"] {
+        background: #FFFFFF !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 12px !important;
+        overflow: hidden;
+    }
+
+    /* ---------- ALERTS ---------- */
+
+    [data-testid="stAlert"] {
+        border-radius: 12px !important;
+    }
+
+    [data-testid="stAlert"] p {
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+    }
+
+    /* ---------- SIDEBAR ---------- */
+
+    section[data-testid="stSidebar"] {
+        background: #173D2B !important;
+        border-right: 1px solid #2C533C;
+    }
+
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3,
+    section[data-testid="stSidebar"] h4 {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
+        color: #F0F5F0 !important;
+        -webkit-text-fill-color: #F0F5F0 !important;
+    }
+
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+        color: #D0DFD2 !important;
+        -webkit-text-fill-color: #D0DFD2 !important;
+    }
+
+    section[data-testid="stSidebar"] input,
+    section[data-testid="stSidebar"] textarea {
+        background: #FFFFFF !important;
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+    }
+
+    section[data-testid="stSidebar"] [data-baseweb="select"] > div {
+        background: #FFFFFF !important;
+    }
+
+    section[data-testid="stSidebar"] [data-baseweb="select"] * {
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+    }
+
+    /* ---------- DIVIDERS ---------- */
+
+    hr {
+        border-color: var(--border) !important;
+        margin: 28px 0 !important;
+    }
+
+    /* ---------- FOOTER ---------- */
+
+    .footer {
+        text-align: center;
+        padding: 28px 10px 8px;
+        color: #66766B !important;
+        font-size: 12px;
+        line-height: 1.9;
+    }
+
+    .footer strong {
+        color: #24563D !important;
+        -webkit-text-fill-color: #24563D !important;
+    }
+
+    /* ---------- RESPONSIVE ---------- */
+
+    @media (max-width: 768px) {
+        [data-testid="stAppViewContainer"] .main .block-container {
+            padding: 1rem 1rem 2rem;
         }
 
         .hero {
-            background: linear-gradient(120deg, #18392B 0%, #2F6950 100%);
-            padding: 32px 34px;
-            border-radius: 18px;
-            color: #FFFFFF;
-            margin-bottom: 26px;
-            box-shadow: 0 8px 24px rgba(24, 57, 43, 0.10);
+            padding: 25px 22px;
+            border-radius: 16px;
         }
 
-        .hero-kicker {
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 2px;
-            color: #C7DCCB;
-            margin-bottom: 12px;
-        }
-
-        .hero h1 {
-            color: #FFFFFF;
-            font-size: 34px;
-            line-height: 1.25;
-            margin: 0 0 10px 0;
-        }
-
-        .hero-description {
-            color: #E3EEE6;
-            font-size: 15px;
-            line-height: 1.7;
-            margin: 0;
+        .metric-card,
+        .panel {
+            padding: 16px;
         }
 
         .section-heading {
-            color: #20382B;
-            font-size: 21px;
-            font-weight: 650;
-            margin: 22px 0 8px 0;
+            font-size: 20px;
         }
-
-        [data-testid="stMetric"] {
-            background: #FFFFFF;
-            border: 1px solid #DDE6DE;
-            border-radius: 14px;
-            padding: 18px 20px;
-            min-height: 118px;
-            box-shadow: 0 4px 14px rgba(24, 57, 43, 0.04);
-        }
-
-        [data-testid="stMetricLabel"] {
-            color: #607366;
-            font-size: 13px;
-        }
-
-        [data-testid="stMetricValue"] {
-            color: #20382B;
-            font-weight: 700;
-            font-size: 25px;
-        }
-
-        .stButton > button,
-        [data-testid="stFormSubmitButton"] > button {
-            background-color: #24563D;
-            color: #FFFFFF;
-            border: 1px solid #24563D;
-            border-radius: 9px;
-            font-weight: 600;
-            min-height: 42px;
-            transition: background-color 0.2s ease;
-        }
-
-        .stButton > button:hover,
-        [data-testid="stFormSubmitButton"] > button:hover {
-            background-color: #18392B;
-            color: #FFFFFF;
-            border-color: #18392B;
-        }
-
-        [data-testid="stProgress"] > div > div {
-            background-color: #2F6950;
-        }
-
-        div[data-testid="stPlotlyChart"] {
-            background-color: transparent;
-        }
-
-        div[data-testid="stDataFrame"] {
-            border: 1px solid #DDE6DE;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .footer-note {
-            color: #718075;
-            font-size: 12px;
-            text-align: center;
-            padding: 22px 0 6px 0;
-            border-top: 1px solid #DDE6DE;
-            margin-top: 28px;
-        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-# 4. SIDEBAR: BUDGET AND EXPENSE FORM
-with st.sidebar:
-    st.markdown("# UniSpend")
-    st.caption("STUDENT FINANCE MANAGER")
-    st.divider()
+# =========================================================
+# 3. DATABASE CONNECTION
+# =========================================================
 
-    st.subheader("Monthly budget")
-    saved_budget = get_monthly_budget()
+def get_connection():
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-    monthly_budget = st.number_input(
-        "Budget (LKR)",
-        min_value=0,
-        max_value=10_000_000,
-        value=saved_budget,
-        step=500,
-        key="monthly_budget_input",
+
+def init_database():
+    with closing(get_connection()) as conn:
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount REAL NOT NULL,
+                expense_date TEXT NOT NULL,
+                note TEXT DEFAULT ''
+            )
+        """)
+
+        # Use a new settings table so the existing settings table
+        # is not destructively changed.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS savings_goals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                target_amount REAL NOT NULL,
+                saved_amount REAL DEFAULT 0,
+                deadline TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Preserve an existing budget setting where possible.
+        existing_budget = conn.execute("""
+            SELECT value
+            FROM app_settings
+            WHERE key = 'monthly_budget'
+        """).fetchone()
+
+        if existing_budget is None:
+            old_settings = conn.execute(
+                "PRAGMA table_info(settings)"
+            ).fetchall()
+
+            old_columns = [row["name"] for row in old_settings]
+            recovered_budget = None
+
+            if old_columns:
+                value_column = next(
+                    (
+                        column for column in
+                        ["value", "setting_value", "monthly_budget", "budget"]
+                        if column in old_columns
+                    ),
+                    None,
+                )
+
+                key_column = next(
+                    (
+                        column for column in
+                        ["key", "setting_key", "name", "setting"]
+                        if column in old_columns
+                    ),
+                    None,
+                )
+
+                if value_column:
+                    if key_column:
+                        try:
+                            row = conn.execute(
+                                f"""
+                                SELECT "{value_column}"
+                                FROM settings
+                                WHERE "{key_column}" = ?
+                                LIMIT 1
+                                """,
+                                ("monthly_budget",),
+                            ).fetchone()
+
+                            if row is not None:
+                                recovered_budget = float(row[0])
+                        except (ValueError, TypeError, sqlite3.Error):
+                            recovered_budget = None
+
+                    if recovered_budget is None and value_column in [
+                        "monthly_budget", "budget"
+                    ]:
+                        try:
+                            row = conn.execute(
+                                f"""
+                                SELECT "{value_column}"
+                                FROM settings
+                                LIMIT 1
+                                """
+                            ).fetchone()
+
+                            if row is not None:
+                                recovered_budget = float(row[0])
+                        except (ValueError, TypeError, sqlite3.Error):
+                            recovered_budget = None
+
+            if recovered_budget is None or recovered_budget < 0:
+                recovered_budget = 15000.0
+
+            conn.execute("""
+                INSERT OR IGNORE INTO app_settings (key, value)
+                VALUES (?, ?)
+            """, ("monthly_budget", str(recovered_budget)))
+
+        conn.commit()
+
+
+# =========================================================
+# 4. SETTINGS AND EXPENSE FUNCTIONS
+# =========================================================
+
+def get_monthly_budget():
+    with closing(get_connection()) as conn:
+        row = conn.execute("""
+            SELECT value
+            FROM app_settings
+            WHERE key = 'monthly_budget'
+        """).fetchone()
+
+    if row is None:
+        return 15000.0
+
+    try:
+        return max(float(row["value"]), 0.0)
+    except (ValueError, TypeError):
+        return 15000.0
+
+
+def save_monthly_budget(amount):
+    with closing(get_connection()) as conn:
+        conn.execute("""
+            INSERT INTO app_settings (key, value)
+            VALUES ('monthly_budget', ?)
+            ON CONFLICT(key)
+            DO UPDATE SET value = excluded.value
+        """, (str(float(amount)),))
+        conn.commit()
+
+
+def get_expenses():
+    with closing(get_connection()) as conn:
+        rows = conn.execute("""
+            SELECT id, name, category, amount, expense_date, note
+            FROM expenses
+            ORDER BY expense_date DESC, id DESC
+        """).fetchall()
+
+    columns = [
+        "id", "name", "category", "amount", "expense_date", "note"
+    ]
+
+    df = pd.DataFrame([dict(row) for row in rows], columns=columns)
+
+    if df.empty:
+        return df
+
+    df["amount"] = pd.to_numeric(
+        df["amount"], errors="coerce"
+    ).fillna(0)
+
+    df["expense_date"] = pd.to_datetime(
+        df["expense_date"], errors="coerce"
     )
 
-    if monthly_budget != saved_budget:
-        save_monthly_budget(monthly_budget)
+    return df.dropna(subset=["expense_date"])
 
-    st.caption("Your budget is saved automatically.")
+
+
+def add_expense(name, category, amount, expense_date, note):
+    name = str(name).strip()
+
+    if not name:
+        raise ValueError("Expense name cannot be empty.")
+
+    amount = float(amount)
+
+    if not math.isfinite(amount) or amount <= 0:
+        raise ValueError("Expense amount must be greater than zero.")
+
+    if category not in CATEGORIES:
+        raise ValueError("Please select a valid expense category.")
+
+    if expense_date > date.today():
+        raise ValueError("Expense date cannot be in the future.")
+
+    with closing(get_connection()) as conn:
+        conn.execute("""
+            INSERT INTO expenses
+            (name, category, amount, expense_date, note)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            name,
+            category,
+            amount,
+            expense_date.isoformat(),
+            str(note or "").strip(),
+        ))
+        conn.commit()
+
+
+
+def update_expense(
+    expense_id, name, category, amount, expense_date, note
+):
+    with closing(get_connection()) as conn:
+        conn.execute("""
+            UPDATE expenses
+            SET name = ?,
+                category = ?,
+                amount = ?,
+                expense_date = ?,
+                note = ?
+            WHERE id = ?
+        """, (
+            name.strip(),
+            category,
+            float(amount),
+            expense_date.isoformat(),
+            note.strip(),
+            int(expense_id),
+        ))
+        conn.commit()
+
+
+def delete_expense(expense_id):
+    with closing(get_connection()) as conn:
+        conn.execute(
+            "DELETE FROM expenses WHERE id = ?",
+            (int(expense_id),),
+        )
+        conn.commit()
+
+
+# =========================================================
+# 5. SAVINGS GOALS
+# =========================================================
+
+def get_savings_goals():
+    with closing(get_connection()) as conn:
+        rows = conn.execute("""
+            SELECT id, name, target_amount, saved_amount,
+                   deadline, created_at
+            FROM savings_goals
+            ORDER BY id DESC
+        """).fetchall()
+
+    return pd.DataFrame([dict(row) for row in rows])
+
+
+
+def add_savings_goal(name, target_amount, saved_amount, deadline):
+    name = str(name).strip()
+    target_amount = float(target_amount)
+    saved_amount = float(saved_amount)
+
+    if not name:
+        raise ValueError("Goal name cannot be empty.")
+
+    if not math.isfinite(target_amount) or target_amount <= 0:
+        raise ValueError("Target amount must be greater than zero.")
+
+    if not math.isfinite(saved_amount) or saved_amount < 0:
+        raise ValueError("Saved amount cannot be negative.")
+
+    if saved_amount > target_amount:
+        raise ValueError("Saved amount cannot exceed the target amount.")
+
+    deadline_value = str(deadline or "").strip()
+
+    with closing(get_connection()) as conn:
+        duplicate = conn.execute(
+            """
+            SELECT 1
+            FROM savings_goals
+            WHERE lower(trim(name)) = lower(trim(?))
+              AND target_amount = ?
+              AND saved_amount < target_amount
+            LIMIT 1
+            """,
+            (name, target_amount),
+        ).fetchone()
+
+        if duplicate:
+            return False
+
+        conn.execute(
+            """
+            INSERT INTO savings_goals
+            (name, target_amount, saved_amount, deadline, created_at)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                name,
+                target_amount,
+                saved_amount,
+                deadline_value,
+                date.today().isoformat(),
+            ),
+        )
+        conn.commit()
+
+    return True
+
+
+
+def update_savings_progress(goal_id, saved_amount):
+    saved_amount = float(saved_amount)
+
+    if not math.isfinite(saved_amount) or saved_amount < 0:
+        raise ValueError(
+            "Saved amount must be a valid, non-negative number."
+        )
+
+    with closing(get_connection()) as conn:
+        goal = conn.execute(
+            """
+            SELECT target_amount
+            FROM savings_goals
+            WHERE id = ?
+            """,
+            (int(goal_id),),
+        ).fetchone()
+
+        if goal is None:
+            raise ValueError("Savings goal not found.")
+
+        target_amount = float(goal["target_amount"])
+
+        if saved_amount > target_amount:
+            raise ValueError(
+                "Saved amount cannot exceed the target amount."
+            )
+
+        conn.execute(
+            """
+            UPDATE savings_goals
+            SET saved_amount = ?
+            WHERE id = ?
+            """,
+            (saved_amount, int(goal_id)),
+        )
+        conn.commit()
+
+
+# =========================================================
+# 6. HELPER FUNCTIONS
+# =========================================================
+
+def money(value):
+    return f"Rs. {float(value):,.2f}"
+
+
+def current_month_expenses(df):
+    if df.empty:
+        return df.copy()
+
+    today = date.today()
+
+    return df[
+        (df["expense_date"].dt.year == today.year)
+        & (df["expense_date"].dt.month == today.month)
+    ].copy()
+
+
+def section_heading(title, subtitle=""):
+    st.markdown(
+        f'<div class="section-heading">{title}</div>',
+        unsafe_allow_html=True,
+    )
+
+    if subtitle:
+        st.markdown(
+            f'<div class="section-subtitle">{subtitle}</div>',
+            unsafe_allow_html=True,
+        )
+
+
+def metric_card(label, value, note):
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{value}</div>
+            <div class="metric-note">{note}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def style_chart(fig, height=330):
+    fig.update_layout(
+        height=height,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font={
+            "family": "DM Sans, sans-serif",
+            "color": TEXT,
+            "size": 12,
+        },
+        margin={"l": 12, "r": 12, "t": 25, "b": 12},
+        legend={"bgcolor": "rgba(0,0,0,0)"},
+    )
+
+    fig.update_xaxes(
+        showgrid=False,
+        linecolor=BORDER,
+        tickfont={"color": MUTED},
+    )
+
+    fig.update_yaxes(
+        gridcolor="#E8EEE9",
+        zerolinecolor=BORDER,
+        tickfont={"color": MUTED},
+    )
+
+    return fig
+
+
+# =========================================================
+# 7. INITIALIZE APP
+# =========================================================
+
+init_database()
+
+df = get_expenses()
+month_df = current_month_expenses(df)
+
+budget = get_monthly_budget()
+monthly_spent = (
+    float(month_df["amount"].sum())
+    if not month_df.empty else 0.0
+)
+remaining = budget - monthly_spent
+transaction_count = len(month_df)
+
+budget_used = (
+    monthly_spent / budget * 100
+    if budget > 0 else 0.0
+)
+
+
+# =========================================================
+# 8. SIDEBAR
+# =========================================================
+
+with st.sidebar:
+    st.markdown(
+        """
+        <div style="padding: 10px 0 22px 0;">
+            <div style="font-size: 25px; font-weight: 800;
+                        color: #FFFFFF; font-family: Manrope, sans-serif;">
+                UniSpend
+            </div>
+            <div style="font-size: 12px; color: #D0DED3;">
+                Your student finance companion
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     st.divider()
 
-    st.subheader("＋ Add an expense")
+    st.markdown("### Monthly budget")
 
-    with st.form("expense_form", clear_on_submit=True):
+    with st.form("budget_form"):
+        budget_input = st.number_input(
+            "Monthly budget (Rs.)",
+            min_value=0.0,
+            value=float(budget),
+            step=500.0,
+        )
+
+        save_budget = st.form_submit_button(
+            "Save monthly budget",
+            use_container_width=True,
+        )
+
+        if save_budget:
+            save_monthly_budget(budget_input)
+            st.success("Monthly budget saved.")
+            st.rerun()
+
+    st.divider()
+
+    st.markdown("### Add an expense")
+    st.caption("Record your spending to keep your budget up to date.")
+
+    with st.form("add_expense_form", clear_on_submit=True):
         expense_name = st.text_input(
             "Expense name",
-            placeholder="e.g. Campus lunch",
+            placeholder="e.g. Lunch, bus fare",
         )
 
         expense_amount = st.number_input(
-            "Amount (LKR)",
-            min_value=1,
-            max_value=10_000_000,
-            value=100,
-            step=50,
+            "Amount (Rs.)",
+            min_value=0.0,
+            value=0.0,
+            step=50.0,
         )
 
-        expense_category = st.selectbox("Category", CATEGORIES)
+        expense_category = st.selectbox(
+            "Category",
+            CATEGORIES,
+        )
 
         expense_date = st.date_input(
             "Date",
@@ -394,19 +1084,22 @@ with st.sidebar:
             max_value=date.today(),
         )
 
-        expense_note = st.text_input(
+        expense_note = st.text_area(
             "Note (optional)",
-            placeholder="e.g. Lunch after lectures",
+            placeholder="Add a short note...",
+            height=75,
         )
 
-        submitted = st.form_submit_button(
-            "＋ Add expense",
+        add_submitted = st.form_submit_button(
+            "Add expense",
             use_container_width=True,
         )
 
-        if submitted:
+        if add_submitted:
             if not expense_name.strip():
                 st.error("Please enter an expense name.")
+            elif expense_amount <= 0:
+                st.error("Amount must be greater than zero.")
             else:
                 add_expense(
                     expense_name,
@@ -415,441 +1108,437 @@ with st.sidebar:
                     expense_date,
                     expense_note,
                 )
+                st.success("Expense added successfully.")
                 st.rerun()
 
-    st.divider()
-
-    with st.expander("Demo data"):
+    with st.expander("Sample data"):
         st.caption(
-            "Add example transactions to preview the dashboard. "
-            "Existing example transactions will not be duplicated."
+            "Sample expenses can be added manually if the database "
+            "does not contain any transactions."
         )
-        if st.button("Load sample transactions", use_container_width=True):
-            load_demo_data()
-            st.rerun()
+
+        if st.button("Load demo data", use_container_width=True):
+            if get_expenses().empty:
+                today = date.today()
+
+                samples = [
+                    ("Lunch", "Food & Drinks", 450, 1, "Campus lunch"),
+                    ("Bus fare", "Transport", 180, 1, "Travel"),
+                    ("Mobile data", "Data & Internet", 650, 2, "Data package"),
+                    ("Notebook", "Education", 320, 3, "Study supplies"),
+                    ("Groceries", "Food & Drinks", 1250, 4, "Weekly groceries"),
+                    ("Personal items", "Personal Care", 540, 5, ""),
+                ]
+
+                for name, category, amount, days_ago, note in samples:
+                    add_expense(
+                        name,
+                        category,
+                        amount,
+                        today - timedelta(days=days_ago),
+                        note,
+                    )
+
+                st.success("Sample expenses added.")
+                st.rerun()
+            else:
+                st.info(
+                    "Existing transactions were found. "
+                    "No sample data was added."
+                )
+
+    st.divider()
+    st.caption("Spend mindfully. Save consistently.")
 
 
-# 5. PREPARE DASHBOARD DATA
-all_expenses = get_expenses()
-today = date.today()
+# =========================================================
+# 9. HERO
+# =========================================================
 
-if all_expenses:
-    df = pd.DataFrame(all_expenses)
-    df["date_parsed"] = pd.to_datetime(df["expense_date"])
-
-    current_month_df = df[
-        (df["date_parsed"].dt.year == today.year)
-        & (df["date_parsed"].dt.month == today.month)
-    ].copy()
-else:
-    df = pd.DataFrame(
-        columns=["id", "name", "category", "amount", "expense_date", "note", "date_parsed"]
-    )
-    current_month_df = df.copy()
-
-if not current_month_df.empty:
-    total_spent = float(current_month_df["amount"].sum())
-else:
-    total_spent = 0.0
-
-remaining = monthly_budget - total_spent
-transaction_count = len(current_month_df)
-
-if monthly_budget > 0:
-    usage_percent = (total_spent / monthly_budget) * 100
-    progress_value = min(total_spent / monthly_budget, 1.0)
-else:
-    usage_percent = 0.0
-    progress_value = 0.0
-
-
-def currency(amount):
-    """Format an amount as Sri Lankan rupees."""
-    return f"LKR {amount:,.0f}"
-
-# 6. DASHBOARD HEADER
 st.markdown(
     """
     <div class="hero">
-        <div class="hero-kicker">STUDENT FINANCE · CONTROL CENTER</div>
+        <div class="eyebrow">YOUR MONEY, YOUR FUTURE</div>
         <h1>Make every rupee count.</h1>
-        <p class="hero-description">
-            Understand your spending, stay within your budget, and build smarter financial habits.
+        <p>
+            Understand your spending, stay within your monthly budget,
+            and build better money habits one day at a time.
         </p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="section-heading">Financial overview</div>', unsafe_allow_html=True)
-st.caption(today.strftime("%A, %d %B %Y"))
+st.markdown(f"**Overview for {date.today().strftime('%B %Y')}**")
+st.caption("Your financial snapshot for the current month.")
 
 
-# 7. SUMMARY METRICS
-budget_col, spent_col, balance_col, transactions_col = st.columns(4, gap="medium")
+# =========================================================
+# 10. DASHBOARD METRICS
+# =========================================================
 
-with budget_col:
-    st.metric(
-        label="Monthly budget",
-        value=currency(monthly_budget),
-        help="Your monthly spending limit",
+col1, col2, col3, col4 = st.columns(4, gap="medium")
+
+with col1:
+    metric_card("Monthly budget", money(budget), "Your spending limit")
+
+with col2:
+    metric_card(
+        "Total spent",
+        money(monthly_spent),
+        f"{budget_used:.1f}% of your budget used",
     )
 
-with spent_col:
-    st.metric(
-        label="Total spent",
-        value=currency(total_spent),
-        help="Expenses recorded during this calendar month",
+with col3:
+    metric_card(
+        "Remaining balance",
+        money(remaining),
+        "Budget minus spending",
     )
 
-with balance_col:
-    balance_display = currency(remaining) if remaining >= 0 else f"-{currency(abs(remaining))}"
-    st.metric(
-        label="Remaining balance",
-        value=balance_display,
-        help="Money remaining after recorded expenses",
-    )
-
-with transactions_col:
-    st.metric(
-        label="Transactions",
-        value=transaction_count,
-        help="Expenses recorded during this calendar month",
+with col4:
+    metric_card(
+        "Transactions",
+        f"{transaction_count:,}",
+        "Expenses recorded this month",
     )
 
 
-# 8. BUDGET HEALTH
-st.markdown('<div class="section-heading">Budget health</div>', unsafe_allow_html=True)
+# =========================================================
+# 11. BUDGET HEALTH
+# =========================================================
 
-if monthly_budget > 0:
-    st.progress(progress_value)
+section_heading(
+    "Budget health",
+    "Track how much of your monthly budget you have used.",
+)
 
-    if total_spent > monthly_budget:
-        st.warning(
-            f"You have exceeded your monthly budget by {currency(total_spent - monthly_budget)}."
-        )
-    elif usage_percent >= 80:
-        st.warning(
-            f"You have used {usage_percent:.1f}% of your budget. "
-            "Consider limiting non-essential expenses."
-        )
+st.markdown('<div class="panel">', unsafe_allow_html=True)
+
+progress_value = (
+    min(max(budget_used / 100, 0), 1)
+    if budget > 0 else 0
+)
+
+st.progress(progress_value)
+
+p1, p2 = st.columns(2)
+
+with p1:
+    st.markdown(f"**{budget_used:.1f}% used**")
+    st.caption(f"Spent: {money(monthly_spent)}")
+
+with p2:
+    if remaining >= 0:
+        st.markdown(f"**{money(remaining)} remaining**")
     else:
-        st.success(f"You have used {usage_percent:.1f}% of your monthly budget.")
+        st.markdown(f"**{money(abs(remaining))} over budget**")
+
+    st.caption(f"Budget: {money(budget)}")
+
+if budget <= 0:
+    st.info("Set a monthly budget in the sidebar to track spending.")
+elif remaining < 0:
+    st.error(
+        f"You have exceeded your budget by {money(abs(remaining))}. "
+        "Review your recent expenses."
+    )
+elif budget_used >= 80:
+    st.warning(
+        "You have used at least 80% of your monthly budget."
+    )
 else:
-    st.info("Your monthly budget is LKR 0. Set a budget in the sidebar to activate budget tracking.")
+    st.success("You are within your monthly budget.")
+
+st.markdown("</div>", unsafe_allow_html=True)
 
 
+# =========================================================
+# 12. SPENDING INSIGHTS
+# =========================================================
 
-# 9. SPENDING INSIGHTS
-st.markdown(
-    '<div class="section-heading">Spending insights</div>',
-    unsafe_allow_html=True,
+section_heading(
+    "Spending insights",
+    "Understand where your money goes and how spending changes.",
 )
 
 chart_left, chart_right = st.columns(2, gap="large")
 
-
-# CATEGORY-WISE SPENDING
 with chart_left:
-    with st.container(border=True):
-        st.subheader("Spending by category")
-        st.caption("How your money is distributed this month.")
+    st.markdown("#### Spending by category")
 
-        if not current_month_df.empty:
-            category_totals = (
-                current_month_df
-                .groupby("category", as_index=False)["amount"]
-                .sum()
-                .sort_values("amount", ascending=False)
-            )
-
-            pie_chart = px.pie(
-                category_totals,
-                names="category",
-                values="amount",
-                hole=0.60,
-                color_discrete_sequence=CHART_COLORS,
-            )
-
-            pie_chart.update_traces(
-                textposition="inside",
-                textinfo="percent",
-                hovertemplate=(
-                    "%{label}<br>"
-                    "LKR %{value:,.2f}"
-                    "<extra></extra>"
-                ),
-            )
-
-            pie_chart.update_layout(
-                showlegend=True,
-                legend=dict(
-                    orientation="h",
-                    yanchor="top",
-                    y=-0.10,
-                    xanchor="center",
-                    x=0.5,
-                    font=dict(size=11),
-                ),
-                margin=dict(t=15, b=65, l=10, r=10),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(
-                    family="Arial, sans-serif",
-                    color="#33483C",
-                ),
-            )
-
-            st.plotly_chart(
-                pie_chart,
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
-        else:
-            st.info(
-                "Add expenses this month to view your category-wise spending."
-            )
-
-
-# SPENDING DURING THE LAST SEVEN DAYS
-with chart_right:
-    with st.container(border=True):
-        st.subheader("Last 7 days")
-        st.caption("Track your daily spending trend.")
-
-        week_start = today - timedelta(days=6)
-        date_range = pd.date_range(
-            start=week_start,
-            end=today,
-            freq="D",
+    if month_df.empty:
+        st.info("Add expenses to see your category breakdown.")
+    else:
+        category_data = (
+            month_df.groupby("category", as_index=False)["amount"]
+            .sum()
+            .sort_values("amount", ascending=False)
         )
 
-        if not df.empty:
-            week_df = df[
-                df["date_parsed"].dt.date.between(week_start, today)
-            ].copy()
-        else:
-            week_df = pd.DataFrame()
-
-        if not week_df.empty:
-            daily_spending = (
-                week_df
-                .groupby(week_df["date_parsed"].dt.date)["amount"]
-                .sum()
-            )
-        else:
-            daily_spending = pd.Series(dtype="float64")
-
-        # Retain all seven dates, including days without expenses.
-        daily_chart_df = pd.DataFrame({
-            "date": date_range,
-            "amount": [
-                float(daily_spending.get(day.date(), 0))
-                for day in date_range
-            ],
-        })
-
-        bar_chart = px.bar(
-            daily_chart_df,
-            x="date",
-            y="amount",
-            labels={
-                "date": "Date",
-                "amount": "Amount (LKR)",
-            },
-            color_discrete_sequence=["#2F6950"],
+        fig = px.pie(
+            category_data,
+            names="category",
+            values="amount",
+            hole=0.62,
+            color_discrete_sequence=CHART_COLORS,
         )
 
-        bar_chart.update_traces(
-            marker_line_width=0,
+        fig.update_traces(
+            textposition="inside",
+            textinfo="percent",
+            marker={"line": {"color": "#FFFFFF", "width": 2}},
             hovertemplate=(
-                "%{x|%d %b %Y}<br>"
-                "LKR %{y:,.2f}"
-                "<extra></extra>"
+                "%{label}<br>Rs. %{value:,.2f}<extra></extra>"
             ),
         )
 
-        bar_chart.update_layout(
-            margin=dict(t=20, b=15, l=10, r=10),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(
-                family="Arial, sans-serif",
-                color="#33483C",
-            ),
-            showlegend=False,
-            xaxis=dict(
-                title=None,
-                showgrid=False,
-                tickformat="%d %b",
-                dtick=24 * 60 * 60 * 1000,
-            ),
-            yaxis=dict(
-                title="Amount (LKR)",
-                showgrid=True,
-                gridcolor="#E5ECE6",
-                zeroline=False,
-                rangemode="tozero",
-            ),
+        fig = style_chart(fig, 340)
+        fig.update_layout(
+            legend={"orientation": "h", "y": -0.12, "x": 0}
         )
 
-        st.plotly_chart(
-            bar_chart,
-            use_container_width=True,
-            config={"displayModeBar": False},
+        st.plotly_chart(fig, use_container_width=True)
+
+        top_category = category_data.iloc[0]
+
+        st.caption(
+            f"Highest spending category: {top_category['category']} "
+            f"({money(top_category['amount'])})"
+        )
+
+with chart_right:
+    st.markdown("#### Spending over the last 7 days")
+
+    today = date.today()
+    seven_days_ago = today - timedelta(days=6)
+
+    if df.empty:
+        st.info("Your daily spending chart will appear here.")
+    else:
+        recent = df[
+            (df["expense_date"].dt.date >= seven_days_ago)
+            & (df["expense_date"].dt.date <= today)
+        ].copy()
+
+        daily_dates = [
+            seven_days_ago + timedelta(days=i)
+            for i in range(7)
+        ]
+
+        daily_data = (
+            recent.groupby(recent["expense_date"].dt.date)["amount"]
+            .sum()
+            .reindex(daily_dates, fill_value=0)
+            .rename_axis("date")
+            .reset_index(name="amount")
+        )
+
+        daily_data["day"] = pd.to_datetime(
+            daily_data["date"]
+        ).dt.strftime("%a")
+
+        fig = px.bar(
+            daily_data,
+            x="day",
+            y="amount",
+            labels={"day": "Day", "amount": "Spending (Rs.)"},
+            color_discrete_sequence=["#477B58"],
+        )
+
+        fig.update_traces(
+            hovertemplate=(
+                "%{x}<br>Rs. %{y:,.2f}<extra></extra>"
+            )
+        )
+
+        fig = style_chart(fig, 340)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.caption(
+            "Total in the last 7 days: "
+            f"{money(daily_data['amount'].sum())}"
         )
 
 
+# =========================================================
+# 13. ADVANCED ANALYTICS
+# =========================================================
 
-# 10. ADVANCED SPENDING ANALYTICS
-st.markdown(
-    '<div class="section-heading">Advanced spending analytics</div>',
-    unsafe_allow_html=True,
+section_heading(
+    "Advanced analytics",
+    "Explore monthly trends and useful spending indicators.",
 )
-st.caption("Explore monthly trends and identify where your money goes.")
 
 analytics_left, analytics_right = st.columns(2, gap="large")
 
-# MONTHLY SPENDING TREND: current month plus the previous five months.
 with analytics_left:
-    with st.container(border=True):
-        st.subheader("Monthly spending trend")
-        st.caption("Compare your total expenses across the last six months.")
+    st.markdown("#### Monthly spending trend")
 
-        if not df.empty:
-            monthly_source = df.copy()
-            monthly_source["month"] = monthly_source["date_parsed"].dt.to_period("M")
-            current_period = pd.Period(today, freq="M")
-            periods = pd.period_range(end=current_period, periods=6, freq="M")
-            monthly_totals = (
-                monthly_source.groupby("month")["amount"].sum()
-                .reindex(periods, fill_value=0)
-                .rename_axis("month")
-                .reset_index(name="amount")
-            )
-            monthly_totals["Month"] = monthly_totals["month"].dt.strftime("%b %Y")
+    if df.empty:
+        st.info("Your monthly trend will appear after recording expenses.")
+    else:
+        today = date.today()
 
-            monthly_chart = px.bar(
-                monthly_totals,
-                x="Month",
-                y="amount",
-                labels={"amount": "Total spending (LKR)"},
-                color_discrete_sequence=["#2F6950"],
-            )
-            monthly_chart.update_traces(
-                marker_line_width=0,
-                hovertemplate="%{x}<br>LKR %{y:,.2f}<extra></extra>",
-            )
-            monthly_chart.update_layout(
-                margin=dict(t=20, b=15, l=10, r=10),
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Arial, sans-serif", color="#33483C"),
-                showlegend=False,
-                xaxis=dict(title=None, showgrid=False),
-                yaxis=dict(
-                    title="Total spending (LKR)",
-                    showgrid=True,
-                    gridcolor="#E5ECE6",
-                    rangemode="tozero",
-                ),
-            )
-            st.plotly_chart(
-                monthly_chart,
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
-        else:
-            st.info("Add expenses to start comparing monthly spending.")
-
-# QUICK INSIGHTS FOR THE CURRENT MONTH.
-with analytics_right:
-    with st.container(border=True):
-        st.subheader("Your spending insights")
-        st.caption("A quick summary based on this month's recorded expenses.")
-
-        if not current_month_df.empty:
-            category_insights = (
-                current_month_df.groupby("category")["amount"]
-                .sum()
-                .sort_values(ascending=False)
-            )
-            top_category = category_insights.index[0]
-            top_amount = float(category_insights.iloc[0])
-            category_share = (top_amount / total_spent * 100) if total_spent else 0
-
-            insight_col1, insight_col2 = st.columns(2)
-            with insight_col1:
-                st.metric("Highest spending category", top_category)
-                st.caption(f"{currency(top_amount)} · {category_share:.1f}% of this month's spending")
-            with insight_col2:
-                days_elapsed = today.day
-                average_daily = total_spent / days_elapsed if days_elapsed else 0
-                st.metric("Average per day", currency(average_daily))
-                st.caption("Average based on calendar days elapsed this month.")
-
-            st.divider()
-            if monthly_budget > 0:
-                # Use the actual number of days in this calendar month for the estimate.
-                if today.month == 12:
-                    next_month = date(today.year + 1, 1, 1)
-                else:
-                    next_month = date(today.year, today.month + 1, 1)
-                days_in_month = (next_month - date(today.year, today.month, 1)).days
-                projected_spending = average_daily * days_in_month
-                st.write(f"At your current daily average, estimated monthly spending is **{currency(projected_spending)}**.")
-                if projected_spending > monthly_budget:
-                    st.warning("Your current spending pace may exceed your monthly budget.")
-                else:
-                    st.success("Your current spending pace is within your monthly budget.")
-        else:
-            st.info("Add expenses for this month to see personalized spending insights.")
-
-
-# 11. RECENT TRANSACTIONS
-st.markdown(
-    '<div class="section-heading">Recent transactions</div>',
-    unsafe_allow_html=True,
-)
-st.caption("View and filter your saved expenses.")
-
-if not df.empty:
-    available_months = sorted(
-        df["date_parsed"].dt.strftime("%Y-%m").unique(),
-        reverse=True,
-    )
-
-    month_options = ["All months"] + available_months
-    category_options = ["All categories"] + sorted(
-        df["category"].dropna().unique().tolist()
-    )
-
-    month_col, category_col = st.columns(2, gap="medium")
-
-    with month_col:
-        selected_month = st.selectbox(
-            "Filter by month",
-            options=month_options,
-            format_func=lambda month: (
-                "All months"
-                if month == "All months"
-                else pd.to_datetime(month).strftime("%B %Y")
-            ),
-            key="transaction_month_filter",
+        month_periods = pd.period_range(
+            end=pd.Period(today, freq="M"),
+            periods=6,
+            freq="M",
         )
 
-    with category_col:
+        first_month = month_periods[0]
+
+        trend_df = df[
+            df["expense_date"].dt.to_period("M") >= first_month
+        ].copy()
+
+        trend_df["month"] = (
+            trend_df["expense_date"].dt.to_period("M").astype(str)
+        )
+
+        trend = trend_df.groupby(
+            "month", as_index=False
+        )["amount"].sum()
+
+        all_months = pd.DataFrame({
+            "month": [str(period) for period in month_periods]
+        })
+
+        trend = all_months.merge(
+            trend, on="month", how="left"
+        )
+
+        trend["amount"] = trend["amount"].fillna(0)
+
+        trend["month_label"] = pd.to_datetime(
+            trend["month"] + "-01"
+        ).dt.strftime("%b %Y")
+
+        fig = px.line(
+            trend,
+            x="month_label",
+            y="amount",
+            markers=True,
+            labels={
+                "month_label": "Month",
+                "amount": "Spending (Rs.)",
+            },
+            color_discrete_sequence=["#24563D"],
+        )
+
+        fig.update_traces(
+            line={"width": 3},
+            marker={"size": 8},
+            hovertemplate=(
+                "%{x}<br>Rs. %{y:,.2f}<extra></extra>"
+            ),
+        )
+
+        fig = style_chart(fig, 330)
+        st.plotly_chart(fig, use_container_width=True)
+
+with analytics_right:
+    st.markdown("#### This month's insights")
+
+    if month_df.empty:
+        st.info("Add expenses to generate monthly insights.")
+    else:
+        category_totals = (
+            month_df.groupby("category")["amount"]
+            .sum()
+            .sort_values(ascending=False)
+        )
+
+        highest_category = category_totals.index[0]
+        highest_amount = float(category_totals.iloc[0])
+
+        today = date.today()
+
+        days_in_month = (
+            (today.replace(day=28) + timedelta(days=4))
+            .replace(day=1)
+            - timedelta(days=1)
+        ).day
+
+        average_daily = monthly_spent / max(today.day, 1)
+        projected_spend = average_daily * days_in_month
+
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+
+        st.markdown("**Highest spending category**")
+        st.markdown(f"### {highest_category}")
+        st.caption(money(highest_amount))
+
+        st.divider()
+
+        st.markdown("**Average daily spending**")
+        st.markdown(f"### {money(average_daily)}")
+
+        st.divider()
+
+        st.markdown("**Estimated spending by month-end**")
+        st.markdown(f"### {money(projected_spend)}")
+
+        if budget > 0 and projected_spend > budget:
+            st.warning(
+                "At your current pace, you may exceed your budget."
+            )
+        else:
+            st.caption(
+                "The projection is an estimate based on spending so far."
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+
+# =========================================================
+# 14. TRANSACTIONS
+# =========================================================
+
+section_heading(
+    "Transactions",
+    "Review, filter, export, edit, or delete expense records.",
+)
+
+if df.empty:
+    st.info(
+        "No expenses recorded yet. Use the sidebar to add your first expense."
+    )
+else:
+    filter1, filter2, filter3 = st.columns([1.3, 1, 1])
+
+    with filter1:
+        month_options = sorted(
+            df["expense_date"].dt.to_period("M").astype(str).unique(),
+            reverse=True,
+        )
+
+        selected_month = st.selectbox(
+            "Filter by month",
+            ["All months"] + month_options,
+        )
+
+    with filter2:
+        category_options = ["All categories"] + sorted(
+            df["category"].dropna().unique().tolist()
+        )
+
         selected_category = st.selectbox(
             "Filter by category",
-            options=category_options,
-            key="transaction_category_filter",
+            category_options,
+        )
+
+    with filter3:
+        search_term = st.text_input(
+            "Search transactions",
+            placeholder="Search by name or note",
         )
 
     filtered_df = df.copy()
 
     if selected_month != "All months":
         filtered_df = filtered_df[
-            filtered_df["date_parsed"].dt.strftime("%Y-%m")
+            filtered_df["expense_date"].dt.to_period("M").astype(str)
             == selected_month
         ]
 
@@ -858,206 +1547,404 @@ if not df.empty:
             filtered_df["category"] == selected_category
         ]
 
-    st.caption(f"Showing {len(filtered_df)} of {len(df)} transactions.")
+    if search_term.strip():
+        search = search_term.strip().lower()
 
-    if not filtered_df.empty:
-        display_df = filtered_df.sort_values(
-            ["date_parsed", "id"],
-            ascending=[False, False],
-        ).copy()
+        filtered_df = filtered_df[
+            filtered_df["name"].str.lower().str.contains(
+                search, na=False
+            )
+            | filtered_df["note"].fillna("").str.lower().str.contains(
+                search, na=False
+            )
+        ]
 
-        display_df["Date"] = display_df["date_parsed"].dt.strftime(
-            "%d %b %Y"
+    st.caption(
+        f"{len(filtered_df)} transaction(s) found. "
+        f"Total: {money(filtered_df['amount'].sum())}"
+    )
+
+    if filtered_df.empty:
+        st.info("No transactions match the selected filters.")
+    else:
+        display_df = filtered_df.copy()
+
+        display_df["expense_date"] = (
+            display_df["expense_date"].dt.strftime("%Y-%m-%d")
         )
-        display_df["Amount (LKR)"] = display_df["amount"].map(
-            lambda amount: f"{amount:,.2f}"
-        )
+
+        display_df["amount"] = display_df["amount"].apply(money)
 
         display_df = display_df[
-            ["Date", "name", "category", "Amount (LKR)", "note"]
-        ]
-        display_df.columns = [
-            "Date", "Expense", "Category", "Amount (LKR)", "Note"
-        ]
+            ["expense_date", "name", "category", "amount", "note"]
+        ].rename(columns={
+            "expense_date": "Date",
+            "name": "Expense",
+            "category": "Category",
+            "amount": "Amount",
+            "note": "Note",
+        })
 
         st.dataframe(
             display_df,
-            hide_index=True,
             use_container_width=True,
+            hide_index=True,
         )
 
-        # Export the currently filtered expenses as a CSV file.
-        export_df = filtered_df[
-            ["expense_date", "name", "category", "amount", "note"]
-        ].copy()
-        export_df = export_df.rename(
-            columns={
-                "expense_date": "Date",
-                "name": "Expense",
-                "category": "Category",
-                "amount": "Amount (LKR)",
-                "note": "Note",
-            }
+        csv_df = filtered_df.copy()
+        csv_df["expense_date"] = (
+            csv_df["expense_date"].dt.strftime("%Y-%m-%d")
         )
-        csv_data = export_df.to_csv(index=False).encode("utf-8-sig")
+
+        csv_data = csv_df[
+            ["expense_date", "name", "category", "amount", "note"]
+        ].to_csv(index=False).encode("utf-8-sig")
 
         st.download_button(
-            label="Download filtered expenses (CSV)",
+            "Download filtered transactions (CSV)",
             data=csv_data,
-            file_name="unispends_expenses.csv",
+            file_name="unispent_transactions.csv",
             mime="text/csv",
-            key="download_filtered_expenses",
-            use_container_width=True,
         )
-    else:
-        st.info("No expenses match the selected filters.")
 
-        # Edit an existing expense
     with st.expander("Edit a transaction"):
-        expenses_for_edit = get_expenses()
-
-        edit_labels = {
-            expense["id"]: (
-                f'{expense["expense_date"]} · {expense["name"]} · '
-                f'LKR {expense["amount"]:,.2f}'
-            )
-            for expense in expenses_for_edit
+        transaction_options = {
+            (
+                f"#{int(row['id'])} | {row['name']} | "
+                f"{money(row['amount'])} | "
+                f"{row['expense_date'].strftime('%Y-%m-%d')}"
+            ): int(row["id"])
+            for _, row in df.iterrows()
         }
 
-        if edit_labels:
-            selected_edit_id = st.selectbox(
-                "Select an expense to edit",
-                options=list(edit_labels.keys()),
-                format_func=lambda expense_id: edit_labels[expense_id],
-                key="edit_expense_id",
+        selected_edit_label = st.selectbox(
+            "Select a transaction to edit",
+            list(transaction_options.keys()),
+            key="edit_transaction_select",
+        )
+
+        selected_edit_id = transaction_options[selected_edit_label]
+
+        edit_row = df[df["id"] == selected_edit_id].iloc[0]
+        edit_date = min(edit_row["expense_date"].date(), date.today())
+
+        with st.form("edit_expense_form"):
+            edit_name = st.text_input(
+                "Expense name",
+                value=str(edit_row["name"]),
             )
 
-            selected_expense = next(
-                expense
-                for expense in expenses_for_edit
-                if expense["id"] == selected_edit_id
+            edit_amount = st.number_input(
+                "Amount (Rs.)",
+                min_value=0.01,
+                value=max(float(edit_row["amount"]), 0.01),
+                step=50.0,
             )
 
-            edit_categories = [
-                "Food & Drinks",
-                "Transport",
-                "Education",
-                "Data & Internet",
-                "Personal Care",
-                "Shopping",
-                "Bills",
-                "Other",
-            ]
+            edit_category = st.selectbox(
+                "Category",
+                CATEGORIES,
+                index=(
+                    CATEGORIES.index(edit_row["category"])
+                    if edit_row["category"] in CATEGORIES
+                    else CATEGORIES.index("Other")
+                ),
+            )
 
-            if selected_expense["category"] not in edit_categories:
-                edit_categories.insert(
-                    0,
-                    selected_expense["category"],
-                )
+            edit_expense_date = st.date_input(
+                "Date",
+                value=edit_date,
+                max_value=date.today(),
+            )
 
-            with st.form(f"edit_expense_form_{selected_edit_id}"):
-                edited_name = st.text_input(
-                    "Expense name",
-                    value=selected_expense["name"],
-                    key=f"edit_name_{selected_edit_id}",
-                )
+            edit_note = st.text_area(
+                "Note",
+                value=str(edit_row["note"] or ""),
+            )
 
-                edited_amount = st.number_input(
-                    "Amount (LKR)",
-                    min_value=0.01,
-                    value=float(selected_expense["amount"]),
-                    step=50.0,
-                    key=f"edit_amount_{selected_edit_id}",
-                )
-
-                edited_category = st.selectbox(
-                    "Category",
-                    options=edit_categories,
-                    index=edit_categories.index(
-                        selected_expense["category"]
-                    ),
-                    key=f"edit_category_{selected_edit_id}",
-                )
-
-                edited_date = st.date_input(
-                    "Expense date",
-                    value=date.fromisoformat(
-                        selected_expense["expense_date"]
-                    ),
-                    key=f"edit_date_{selected_edit_id}",
-                )
-
-                edited_note = st.text_input(
-                    "Note",
-                    value=selected_expense.get("note") or "",
-                    key=f"edit_note_{selected_edit_id}",
-                )
-
-                save_edit = st.form_submit_button("Save changes")
+            save_edit = st.form_submit_button(
+                "Save changes",
+                use_container_width=True,
+            )
 
             if save_edit:
-                if not edited_name.strip():
+                if not edit_name.strip():
                     st.error("Expense name cannot be empty.")
+                elif edit_amount <= 0:
+                    st.error("Amount must be greater than zero.")
                 else:
                     update_expense(
                         selected_edit_id,
-                        edited_name.strip(),
-                        float(edited_amount),
-                        edited_category,
-                        edited_date.isoformat(),
-                        edited_note.strip(),
+                        edit_name,
+                        edit_category,
+                        edit_amount,
+                        edit_expense_date,
+                        edit_note,
                     )
-                    st.success("Expense updated successfully!")
+
+                    st.success("Transaction updated.")
                     st.rerun()
 
-        else:
-            st.info("There are no transactions to edit.")
-
-    with st.expander("Manage transactions"):
-        expenses_for_delete = get_expenses()
-
-        expense_labels = {
-            expense["id"]: (
-                f'{expense["expense_date"]} · {expense["name"]} · '
-                f'LKR {expense["amount"]:,.2f}'
-            )
-            for expense in expenses_for_delete
+    with st.expander("Delete a transaction"):
+        delete_options = {
+            (
+                f"#{int(row['id'])} | {row['name']} | "
+                f"{money(row['amount'])} | "
+                f"{row['expense_date'].strftime('%Y-%m-%d')}"
+            ): int(row["id"])
+            for _, row in df.iterrows()
         }
 
-        if expense_labels:
-            selected_id = st.selectbox(
-                "Select an expense to remove",
-                options=list(expense_labels.keys()),
-                format_func=lambda expense_id: expense_labels[expense_id],
-                key="delete_expense_id",
-            )
+        delete_label = st.selectbox(
+            "Select a transaction to delete",
+            list(delete_options.keys()),
+            key="delete_transaction_select",
+        )
 
-            confirm_delete = st.checkbox(
-                "I want to delete this transaction.",
-                key="confirm_delete_expense",
-            )
+        confirm_delete = st.checkbox(
+            "I understand this will permanently delete the selected transaction."
+        )
 
-            if st.button(
-                "Delete selected transaction",
-                disabled=not confirm_delete,
-            ):
-                delete_expense(selected_id)
+        if st.button("Delete selected transaction"):
+            if confirm_delete:
+                delete_expense(delete_options[delete_label])
+                st.success("Transaction deleted.")
                 st.rerun()
-        else:
-            st.info("There are no transactions to delete.")
-
-else:
-    st.info(
-        "No expenses recorded yet. Add your first expense from the sidebar, "
-        "or load sample transactions to preview the dashboard."
-    )
+            else:
+                st.warning("Confirm the deletion before continuing.")
 
 
-# 11. FOOTER
+
+# ============================================================
+# SECTION 15: SAVINGS GOALS
+# ============================================================
+
+st.divider()
+
+section_heading(
+    "Savings Goals",
+    "Set a target, track your progress, and build better saving habits."
+)
+
+goal_col1, goal_col2 = st.columns([0.9, 1.1], gap="large")
+
+# LEFT COLUMN: CREATE A NEW GOAL
+with goal_col1:
+    st.markdown("#### Create a savings goal")
+
+    with st.form("add_savings_goal_form", clear_on_submit=True):
+        goal_name = st.text_input(
+            "Goal name",
+            placeholder="e.g. New laptop"
+        )
+
+        goal_target = st.number_input(
+            "Target amount (Rs.)",
+            min_value=1.0,
+            value=10000.0,
+            step=500.0
+        )
+
+        goal_saved = st.number_input(
+            "Already saved (Rs.)",
+            min_value=0.0,
+            value=0.0,
+            step=500.0
+        )
+
+        has_deadline = st.checkbox("Set a target date")
+
+        goal_deadline = None
+
+        if has_deadline:
+            goal_deadline = st.date_input(
+                "Target date",
+                value=date.today() + timedelta(days=30),
+                min_value=date.today()
+            )
+
+        create_goal = st.form_submit_button(
+            "Create savings goal",
+            use_container_width=True
+        )
+
+if create_goal:
+    if not goal_name.strip():
+        st.error("Please enter a name for your goal.")
+
+    elif goal_target <= 0:
+        st.error("Target amount must be greater than zero.")
+
+    elif goal_saved < 0:
+        st.error("Saved amount cannot be negative.")
+
+    elif goal_saved > goal_target:
+        st.error(
+            "The amount already saved cannot exceed the target amount."
+        )
+
+    else:
+        deadline_value = (
+            goal_deadline.isoformat()
+            if goal_deadline is not None
+            else None
+        )
+
+        try:
+            created = add_savings_goal(
+                goal_name.strip(),
+                float(goal_target),
+                float(goal_saved),
+                deadline_value,
+            )
+
+            if created:
+                st.success("Savings goal created successfully!")
+                st.rerun()
+            else:
+                st.warning(
+                    "An active goal with the same name and target amount "
+                    "already exists. Please update the existing goal instead."
+                )
+
+        except ValueError as error:
+            st.error(str(error))
+
+
+# RIGHT COLUMN: VIEW AND MANAGE GOALS
+with goal_col2:
+    st.markdown("#### Your goals")
+
+    goals_df = get_savings_goals()
+
+    if goals_df.empty:
+        st.info(
+            "You haven't created any savings goals yet. "
+            "Create your first goal using the form."
+        )
+
+    else:
+        goals_df = goals_df.copy()
+
+        # Handle missing values safely
+        goals_df["deadline"] = (
+            goals_df["deadline"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+        for _, goal in goals_df.iterrows():
+            goal_id = int(goal["id"])
+            goal_name_value = str(goal["name"])
+            target = float(goal["target_amount"])
+            saved = float(goal["saved_amount"])
+
+            progress = min(saved / target, 1.0) if target > 0 else 0.0
+            remaining = max(target - saved, 0.0)
+            deadline = goal["deadline"]
+
+            with st.container(border=True):
+                st.markdown(f"**{goal_name_value}**")
+
+                st.progress(progress)
+
+                metric_col1, metric_col2 = st.columns(2)
+
+                with metric_col1:
+                    st.metric(
+                        "Saved",
+                        f"Rs. {saved:,.2f}"
+                    )
+
+                with metric_col2:
+                    st.metric(
+                        "Target",
+                        f"Rs. {target:,.2f}"
+                    )
+
+                st.caption(
+                    f"{progress * 100:.1f}% completed · "
+                    f"Rs. {remaining:,.2f} remaining"
+                )
+
+                if deadline and deadline.lower() != "nan":
+                    st.caption(f"Target date: {deadline}")
+
+                if progress >= 1:
+                    st.success("Goal completed!")
+
+                # Manage the existing goal
+                with st.expander("Manage goal"):
+                    with st.form(f"update_goal_form_{goal_id}"):
+                        updated_saved = st.number_input(
+                            "Update amount saved (Rs.)",
+                            min_value=0.0,
+                            value=saved,
+                            step=500.0,
+                            key=f"saved_amount_{goal_id}"
+                        )
+
+                        update_goal = st.form_submit_button(
+                            "Update progress",
+                            use_container_width=True
+                        )
+
+                        if update_goal:
+                            if updated_saved > target:
+                                st.error(
+                                    "Saved amount cannot exceed the target."
+                                )
+                            else:
+                                with sqlite3.connect(DB_PATH) as conn:
+                                    conn.execute(
+                                        """
+                                        UPDATE savings_goals
+                                        SET saved_amount = ?
+                                        WHERE id = ?
+                                        """,
+                                        (float(updated_saved), goal_id)
+                                    )
+
+                                st.success("Savings progress updated.")
+                                st.rerun()
+
+                    st.divider()
+
+                    confirm_delete = st.checkbox(
+                        "I want to delete this goal",
+                        key=f"confirm_delete_{goal_id}"
+                    )
+
+                    if st.button(
+                        "Delete goal",
+                        key=f"delete_goal_{goal_id}",
+                        use_container_width=True,
+                        disabled=not confirm_delete
+                    ):
+                        with sqlite3.connect(DB_PATH) as conn:
+                            conn.execute(
+                                """
+                                DELETE FROM savings_goals
+                                WHERE id = ?
+                                """,
+                                (goal_id,)
+                            )
+
+                        st.success("Savings goal deleted.")
+                        st.rerun()
+
+
+# =========================================================
+# 16. FOOTER
+# =========================================================
+
 st.markdown(
     """
-    <div class="footer-note">
-        UniSpend · Spend mindfully. Save consistently. Grow financially.
+    <div class="footer">
+        <strong>UniSpend</strong><br>
+        Spend mindfully. Save consistently. Grow financially.<br>
+        Made for students, one rupee at a time.
     </div>
     """,
     unsafe_allow_html=True,

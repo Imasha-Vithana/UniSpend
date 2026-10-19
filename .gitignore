@@ -1,18 +1,6 @@
-# Python
+.venv/
 __pycache__/
 *.py[cod]
-
-# Virtual environment
-.venv/
-venv/
-
-# Environment variables and secrets
-.env
 .streamlit/secrets.toml
-
-# Editor and operating system files
-.vscode/
-.DS_Store
-Thumbs.db
-
-*.db
+unispends.db
+unispends_backup.db

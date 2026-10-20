@@ -10,9 +10,7 @@ import streamlit as st
 import math
 
 
-# =========================================================
 # 1. CONFIGURATION
-# =========================================================
 
 st.set_page_config(
     page_title="UniSpend | Student Finance",
@@ -52,9 +50,7 @@ BORDER = "#DCE6DE"
 
 
 
-# =========================================================
 # 2. CUSTOM CSS — UNISPEND PROFESSIONAL THEME
-# =========================================================
 
 st.markdown(
     """
@@ -75,19 +71,55 @@ st.markdown(
         --shadow: 0 4px 18px rgba(23, 61, 43, 0.055);
     }
 
-    /* ---------- GLOBAL ---------- */
+    /* Sample data information card */
+    .sample-info-card {
+        background: linear-gradient(135deg, #EAF2EB 0%, #F7FAF7 100%);
+        border: 1px solid #D2E2D4;
+        border-left: 4px solid #397451;
+        border-radius: 12px;
+        padding: 16px 17px;
+        margin: 8px 0 14px 0;
+    }
 
+    .sample-info-title {
+        color: #244B35 !important;
+        -webkit-text-fill-color: #244B35 !important;
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 6px;
+        opacity: 1 !important;
+    }
+
+    .sample-info-description {
+        color: #52685A !important;
+        -webkit-text-fill-color: #52685A !important;
+        font-size: 12px;
+        line-height: 1.7;
+        opacity: 1 !important;
+    }
+
+    .sample-info-status {
+        display: inline-block;
+        background: #D8E9DB;
+        color: #24563D !important;
+        -webkit-text-fill-color: #24563D !important;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 4px 8px;
+        border-radius: 20px;
+        margin-top: 10px;
+        opacity: 1 !important;
+    }
+
+    /* Global */
     html, body, [class*="css"] {
         font-family: 'DM Sans', sans-serif;
     }
 
-    .stApp {
-        background: var(--page) !important;
-        color: var(--text) !important;
-    }
-
+    .stApp,
     [data-testid="stAppViewContainer"] {
         background: var(--page) !important;
+        color: var(--text) !important;
     }
 
     [data-testid="stHeader"] {
@@ -100,20 +132,14 @@ st.markdown(
         padding-bottom: 3rem;
     }
 
-    /* ---------- READABLE TEXT ---------- */
-
-    .main h1,
-    .main h2,
-    .main h3,
-    .main h4 {
+    .main h1, .main h2, .main h3, .main h4 {
         color: var(--forest) !important;
+        -webkit-text-fill-color: var(--forest) !important;
         font-family: 'Manrope', sans-serif !important;
         font-weight: 800 !important;
     }
 
-    .main p,
-    .main li,
-    .main label,
+    .main p, .main li, .main label,
     .main [data-testid="stMarkdownContainer"] p {
         color: var(--text);
     }
@@ -122,17 +148,12 @@ st.markdown(
     [data-testid="stCaptionContainer"] p {
         color: var(--muted) !important;
         -webkit-text-fill-color: var(--muted) !important;
+        opacity: 1 !important;
     }
 
-    /* ---------- HERO ---------- */
-
+    /* Hero */
     .hero {
-        background: linear-gradient(
-            120deg,
-            #173D2B 0%,
-            #24563D 60%,
-            #397451 100%
-        ) !important;
+        background: linear-gradient(120deg, #173D2B 0%, #24563D 60%, #397451 100%) !important;
         padding: 38px;
         border-radius: 22px;
         margin-bottom: 28px;
@@ -166,10 +187,10 @@ st.markdown(
         max-width: 700px;
     }
 
-    /* ---------- SECTION HEADINGS ---------- */
-
+    /* Headings and cards */
     .section-heading {
         color: var(--forest) !important;
+        -webkit-text-fill-color: var(--forest) !important;
         font-family: 'Manrope', sans-serif !important;
         font-size: 22px;
         font-weight: 800;
@@ -178,15 +199,13 @@ st.markdown(
 
     .section-subtitle {
         color: var(--muted) !important;
+        -webkit-text-fill-color: var(--muted) !important;
         font-size: 13px;
         line-height: 1.7;
         margin-bottom: 18px;
     }
 
-    /* ---------- CUSTOM DASHBOARD CARDS ---------- */
-
-    .metric-card,
-    .panel {
+    .metric-card, .panel {
         background: var(--card) !important;
         color: var(--text) !important;
         border: 1px solid var(--border);
@@ -201,7 +220,6 @@ st.markdown(
 
     .metric-label {
         color: var(--muted) !important;
-        -webkit-text-fill-color: var(--muted) !important;
         font-size: 11px;
         font-weight: 700;
         letter-spacing: 0.7px;
@@ -211,7 +229,6 @@ st.markdown(
 
     .metric-value {
         color: var(--forest) !important;
-        -webkit-text-fill-color: var(--forest) !important;
         font-family: 'Manrope', sans-serif !important;
         font-size: clamp(22px, 2vw, 30px);
         font-weight: 800;
@@ -221,7 +238,6 @@ st.markdown(
 
     .metric-note {
         color: var(--muted) !important;
-        -webkit-text-fill-color: var(--muted) !important;
         font-size: 12px;
         margin-top: 9px;
     }
@@ -231,8 +247,7 @@ st.markdown(
         margin-bottom: 18px;
     }
 
-    /* ---------- STREAMLIT METRICS ---------- */
-
+    /* Streamlit metrics */
     [data-testid="stMetric"] {
         background: #FFFFFF !important;
         border: 1px solid var(--border) !important;
@@ -244,6 +259,7 @@ st.markdown(
     [data-testid="stMetricLabel"] p {
         color: var(--muted) !important;
         -webkit-text-fill-color: var(--muted) !important;
+        opacity: 1 !important;
     }
 
     [data-testid="stMetricValue"],
@@ -252,14 +268,10 @@ st.markdown(
         -webkit-text-fill-color: var(--forest) !important;
         font-family: 'Manrope', sans-serif !important;
         font-weight: 800 !important;
+        opacity: 1 !important;
     }
 
-    [data-testid="stMetricDelta"] {
-        font-weight: 600;
-    }
-
-    /* ---------- FORMS ---------- */
-
+    /* Forms and inputs */
     [data-testid="stForm"] {
         background: #FFFFFF !important;
         border: 1px solid var(--border) !important;
@@ -268,23 +280,22 @@ st.markdown(
         box-shadow: var(--shadow);
     }
 
+    [data-testid="stWidgetLabel"],
     [data-testid="stWidgetLabel"] p,
-    [data-testid="stWidgetLabel"] label,
-    [data-testid="stWidgetLabel"] {
+    [data-testid="stWidgetLabel"] label {
         color: var(--text) !important;
         -webkit-text-fill-color: var(--text) !important;
         font-weight: 600 !important;
+        opacity: 1 !important;
     }
 
-    /* ---------- INPUTS ---------- */
-
-    .stApp input,
-    .stApp textarea {
+    .stApp input, .stApp textarea {
         background: #FFFFFF !important;
         color: #25372D !important;
         -webkit-text-fill-color: #25372D !important;
         caret-color: #24563D !important;
         border-radius: 9px !important;
+        opacity: 1 !important;
     }
 
     .stApp input::placeholder,
@@ -307,8 +318,7 @@ st.markdown(
         box-shadow: 0 0 0 1px #397451 !important;
     }
 
-    /* ---------- SELECT BOXES ---------- */
-
+    /* Select boxes */
     .stApp [data-baseweb="select"] > div {
         background: #FFFFFF !important;
         border-color: #CAD8CC !important;
@@ -320,16 +330,11 @@ st.markdown(
     .stApp [data-baseweb="select"] span {
         color: #25372D !important;
         -webkit-text-fill-color: #25372D !important;
+        opacity: 1 !important;
     }
 
-    [data-baseweb="popover"],
-    [data-baseweb="menu"],
-    [role="listbox"] {
-        background: #FFFFFF !important;
-        color: #25372D !important;
-    }
-
-    [role="option"] {
+    [data-baseweb="popover"], [data-baseweb="menu"],
+    [role="listbox"], [role="option"] {
         background: #FFFFFF !important;
         color: #25372D !important;
     }
@@ -338,8 +343,7 @@ st.markdown(
         background: #E7EFE7 !important;
     }
 
-    /* ---------- DATE PICKER ---------- */
-
+    /* Date picker */
     [data-baseweb="calendar"],
     [data-baseweb="calendar"] * {
         color: #25372D !important;
@@ -349,8 +353,7 @@ st.markdown(
         background: #FFFFFF !important;
     }
 
-    /* ---------- BUTTONS ---------- */
-
+    /* Buttons — original dark-green styling */
     .stButton > button,
     .stFormSubmitButton > button,
     [data-testid="stDownloadButton"] > button {
@@ -362,17 +365,17 @@ st.markdown(
         min-height: 42px;
         font-weight: 700 !important;
         box-shadow: none !important;
-        transition: background 0.2s ease, border-color 0.2s ease;
+        opacity: 1 !important;
+        transition: background 0.2s ease;
     }
 
-    .stButton > button p,
-    .stFormSubmitButton > button p,
-    [data-testid="stDownloadButton"] > button p,
-    .stButton > button span,
-    .stFormSubmitButton > button span {
+    .stButton > button *,
+    .stFormSubmitButton > button *,
+    [data-testid="stDownloadButton"] > button * {
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
         font-weight: 700 !important;
+        opacity: 1 !important;
     }
 
     .stButton > button:hover,
@@ -390,47 +393,54 @@ st.markdown(
         border-color: #E1E8E1 !important;
     }
 
-    /* ---------- CHECKBOXES & RADIO BUTTONS ---------- */
-
+    /* Checkboxes and radio buttons */
     [data-testid="stCheckbox"] label,
-    [data-testid="stRadio"] label {
-        color: var(--text) !important;
-        -webkit-text-fill-color: var(--text) !important;
-    }
-
+    [data-testid="stRadio"] label,
     [data-testid="stCheckbox"] p,
     [data-testid="stRadio"] p {
         color: var(--text) !important;
         -webkit-text-fill-color: var(--text) !important;
+        opacity: 1 !important;
     }
 
-    /* ---------- EXPANDERS ---------- */
-
+    /* Expanders */
     [data-testid="stExpander"] {
         background: #FFFFFF !important;
+        color: #173D2B !important;
         border: 1px solid var(--border) !important;
         border-radius: 13px !important;
         overflow: hidden;
+        opacity: 1 !important;
     }
 
+    [data-testid="stExpander"] details,
     [data-testid="stExpander"] summary {
         background: #FFFFFF !important;
-        color: var(--forest) !important;
+        color: #173D2B !important;
+        -webkit-text-fill-color: #173D2B !important;
         font-weight: 700 !important;
+        opacity: 1 !important;
     }
 
+    [data-testid="stExpander"] summary *,
+    [data-testid="stExpander"] summary p,
     [data-testid="stExpander"] summary span,
-    [data-testid="stExpander"] summary p {
-        color: var(--forest) !important;
-        -webkit-text-fill-color: var(--forest) !important;
+    [data-testid="stExpander"] summary svg {
+        color: #173D2B !important;
+        -webkit-text-fill-color: #173D2B !important;
+        fill: #173D2B !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
 
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
     [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
-        color: var(--text) !important;
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+        opacity: 1 !important;
     }
 
-    /* ---------- PROGRESS BARS ---------- */
-
+    /* Progress bars */
     .stProgress > div {
         background: #E5ECE5 !important;
         border-radius: 99px !important;
@@ -441,17 +451,13 @@ st.markdown(
         border-radius: 99px !important;
     }
 
-    /* ---------- DATA TABLES ---------- */
-
-    [data-testid="stDataFrame"],
-    [data-testid="stTable"] {
+    /* Tables and alerts */
+    [data-testid="stDataFrame"], [data-testid="stTable"] {
         background: #FFFFFF !important;
         border: 1px solid var(--border) !important;
         border-radius: 12px !important;
         overflow: hidden;
     }
-
-    /* ---------- ALERTS ---------- */
 
     [data-testid="stAlert"] {
         border-radius: 12px !important;
@@ -460,10 +466,10 @@ st.markdown(
     [data-testid="stAlert"] p {
         color: #25372D !important;
         -webkit-text-fill-color: #25372D !important;
+        opacity: 1 !important;
     }
 
-    /* ---------- SIDEBAR ---------- */
-
+    /* Sidebar */
     section[data-testid="stSidebar"] {
         background: #173D2B !important;
         border-right: 1px solid #2C533C;
@@ -475,6 +481,7 @@ st.markdown(
     section[data-testid="stSidebar"] h4 {
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
+        opacity: 1 !important;
     }
 
     section[data-testid="stSidebar"] p,
@@ -482,11 +489,16 @@ st.markdown(
     section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
         color: #F0F5F0 !important;
         -webkit-text-fill-color: #F0F5F0 !important;
+        opacity: 1 !important;
     }
 
-    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] p {
+    /* Sidebar caption */
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {
         color: #D0DFD2 !important;
         -webkit-text-fill-color: #D0DFD2 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
     }
 
     section[data-testid="stSidebar"] input,
@@ -494,6 +506,7 @@ st.markdown(
         background: #FFFFFF !important;
         color: #25372D !important;
         -webkit-text-fill-color: #25372D !important;
+        opacity: 1 !important;
     }
 
     section[data-testid="stSidebar"] [data-baseweb="select"] > div {
@@ -503,23 +516,64 @@ st.markdown(
     section[data-testid="stSidebar"] [data-baseweb="select"] * {
         color: #25372D !important;
         -webkit-text-fill-color: #25372D !important;
+        opacity: 1 !important;
     }
 
-    /* ---------- DIVIDERS ---------- */
+    
 
+/* Sidebar widget labels — targeted fix only */
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] span {
+    color: #F0F5F0 !important;
+    -webkit-text-fill-color: #F0F5F0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    font-weight: 600 !important;
+}
+
+
+
+    /* FIX: Sample data expander label */
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary *,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+    section[data-testid="stSidebar"] [data-testid="stExpander"] summary span {
+        color: #173D2B !important;
+        -webkit-text-fill-color: #173D2B !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    /* FIX: Input text and placeholders */
+    section[data-testid="stSidebar"] input,
+    section[data-testid="stSidebar"] textarea {
+        color: #25372D !important;
+        -webkit-text-fill-color: #25372D !important;
+        opacity: 1 !important;
+    }
+
+    section[data-testid="stSidebar"] input::placeholder,
+    section[data-testid="stSidebar"] textarea::placeholder {
+        color: #7A897E !important;
+        -webkit-text-fill-color: #7A897E !important;
+        opacity: 1 !important;
+    }
+
+    /* Divider and footer */
     hr {
         border-color: var(--border) !important;
         margin: 28px 0 !important;
     }
 
-    /* ---------- FOOTER ---------- */
-
     .footer {
         text-align: center;
         padding: 28px 10px 8px;
         color: #66766B !important;
+        -webkit-text-fill-color: #66766B !important;
         font-size: 12px;
         line-height: 1.9;
+        opacity: 1 !important;
     }
 
     .footer strong {
@@ -527,36 +581,77 @@ st.markdown(
         -webkit-text-fill-color: #24563D !important;
     }
 
-    /* ---------- RESPONSIVE ---------- */
-
-    @media (max-width: 768px) {
-        [data-testid="stAppViewContainer"] .main .block-container {
-            padding: 1rem 1rem 2rem;
-        }
-
-        .hero {
-            padding: 25px 22px;
-            border-radius: 16px;
-        }
-
-        .metric-card,
-        .panel {
-            padding: 16px;
-        }
-
-        .section-heading {
-            font-size: 20px;
-        }
+/* Mobile layout */
+@media (max-width: 768px) {
+    [data-testid="stAppViewContainer"] .main .block-container {
+        padding: 1rem 1rem 2rem;
     }
+
+    .hero {
+        padding: 25px 22px;
+        border-radius: 16px;
+    }
+
+    .metric-card, .panel {
+        padding: 16px;
+    }
+
+    .section-heading {
+        font-size: 20px;
+    }
+
+} /* Mobile layout eka methanin close wenawa */
+
+
+/* FINAL FIX: Sidebar labels */
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"],
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] *,
+section[data-testid="stSidebar"] .stTextInput label,
+section[data-testid="stSidebar"] .stNumberInput label,
+section[data-testid="stSidebar"] .stSelectbox label,
+section[data-testid="stSidebar"] .stTextArea label,
+section[data-testid="stSidebar"] .stDateInput label {
+    color: #F0F5F0 !important;
+    -webkit-text-fill-color: #F0F5F0 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Sample data label */
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary * {
+    color: #173D2B !important;
+    -webkit-text-fill-color: #173D2B !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Sidebar caption */
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * {
+    color: #D0DFD2 !important;
+    -webkit-text-fill-color: #D0DFD2 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* UniSpend — Sidebar Widget Label Colours */
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] label,
+section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] span {
+    color: #8BC9A5 !important;
+    -webkit-text-fill-color: #8BC9A5 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    font-weight: 600 !important;
+}
+    
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-
-# =========================================================
 # 3. DATABASE CONNECTION
-# =========================================================
 
 def get_connection():
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
@@ -915,9 +1010,7 @@ def update_savings_progress(goal_id, saved_amount):
         conn.commit()
 
 
-# =========================================================
 # 6. HELPER FUNCTIONS
-# =========================================================
 
 def money(value):
     return f"Rs. {float(value):,.2f}"
@@ -990,9 +1083,7 @@ def style_chart(fig, height=330):
     return fig
 
 
-# =========================================================
 # 7. INITIALIZE APP
-# =========================================================
 
 init_database()
 
@@ -1013,35 +1104,22 @@ budget_used = (
 )
 
 
-# =========================================================
+
+
 # 8. SIDEBAR
-# =========================================================
 
 with st.sidebar:
-    st.markdown(
-        """
-        <div style="padding: 10px 0 22px 0;">
-            <div style="font-size: 25px; font-weight: 800;
-                        color: #FFFFFF; font-family: Manrope, sans-serif;">
-                UniSpend
-            </div>
-            <div style="font-size: 12px; color: #D0DED3;">
-                Your student finance companion
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("UniSpend")
+    st.caption("Student Finance Manager")
 
-    st.divider()
+    # MONTHLY BUDGET FORM
+    st.subheader("Monthly Budget")
 
-    st.markdown("### Monthly budget")
-
-    with st.form("budget_form"):
-        budget_input = st.number_input(
+    with st.form("monthly_budget_form"):
+        new_budget = st.number_input(
             "Monthly budget (Rs.)",
             min_value=0.0,
-            value=float(budget),
+            value=float(get_monthly_budget()),
             step=500.0,
         )
 
@@ -1050,26 +1128,29 @@ with st.sidebar:
             use_container_width=True,
         )
 
-        if save_budget:
-            save_monthly_budget(budget_input)
-            st.success("Monthly budget saved.")
+    if save_budget:
+        if not math.isfinite(new_budget) or new_budget < 0:
+            st.error("Enter a valid monthly budget.")
+        else:
+            save_monthly_budget(new_budget)
+            st.success("Monthly budget saved!")
             st.rerun()
 
     st.divider()
 
-    st.markdown("### Add an expense")
-    st.caption("Record your spending to keep your budget up to date.")
+    # ADD EXPENSE FORM
+    st.subheader("Add Expense")
 
     with st.form("add_expense_form", clear_on_submit=True):
         expense_name = st.text_input(
             "Expense name",
-            placeholder="e.g. Lunch, bus fare",
+            placeholder="e.g. Lunch",
         )
 
         expense_amount = st.number_input(
             "Amount (Rs.)",
-            min_value=0.0,
-            value=0.0,
+            min_value=0.01,
+            value=100.0,
             step=50.0,
         )
 
@@ -1079,45 +1160,64 @@ with st.sidebar:
         )
 
         expense_date = st.date_input(
-            "Date",
+            "Expense date",
             value=date.today(),
             max_value=date.today(),
         )
 
-        expense_note = st.text_area(
+        expense_note = st.text_input(
             "Note (optional)",
-            placeholder="Add a short note...",
-            height=75,
+            placeholder="e.g. Lunch at campus",
         )
 
-        add_submitted = st.form_submit_button(
+        add_expense_button = st.form_submit_button(
             "Add expense",
             use_container_width=True,
         )
 
-        if add_submitted:
-            if not expense_name.strip():
-                st.error("Please enter an expense name.")
-            elif expense_amount <= 0:
-                st.error("Amount must be greater than zero.")
-            else:
-                add_expense(
-                    expense_name,
-                    expense_category,
-                    expense_amount,
-                    expense_date,
-                    expense_note,
-                )
-                st.success("Expense added successfully.")
-                st.rerun()
+    if add_expense_button:
+        try:
+            add_expense(
+                expense_name,
+                expense_category,
+                expense_amount,
+                expense_date,
+                expense_note,
+            )
+            st.success("Expense added successfully!")
+            st.rerun()
+        except (ValueError, OverflowError) as error:
+            st.error(str(error))
 
-    with st.expander("Sample data"):
-        st.caption(
-            "Sample expenses can be added manually if the database "
-            "does not contain any transactions."
+    st.divider()
+
+    # SAMPLE DATA
+    with st.expander("Sample data", expanded=False):
+        st.markdown(
+            """
+            <div class="sample-info-card">
+                <div class="sample-info-title">
+                    Demo transactions
+                </div>
+                <div class="sample-info-description">
+                    Explore UniSpend with example expenses when
+                    your database has no transactions yet.
+                    Demo entries can be managed like regular
+                    transactions.
+                </div>
+                <div class="sample-info-status">
+                    OPTIONAL DEMO DATA
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
-        if st.button("Load demo data", use_container_width=True):
+        if st.button(
+            "Load demo data",
+            use_container_width=True,
+            key="load_demo_data",
+        ):
             if get_expenses().empty:
                 today = date.today()
 
@@ -1139,21 +1239,19 @@ with st.sidebar:
                         note,
                     )
 
-                st.success("Sample expenses added.")
+                st.success("Demo expenses added successfully.")
                 st.rerun()
             else:
                 st.info(
-                    "Existing transactions were found. "
-                    "No sample data was added."
+                    "Your database already contains transactions. "
+                    "No demo expenses were added."
                 )
 
     st.divider()
     st.caption("Spend mindfully. Save consistently.")
 
 
-# =========================================================
 # 9. HERO
-# =========================================================
 
 st.markdown(
     """
@@ -1173,9 +1271,7 @@ st.markdown(f"**Overview for {date.today().strftime('%B %Y')}**")
 st.caption("Your financial snapshot for the current month.")
 
 
-# =========================================================
 # 10. DASHBOARD METRICS
-# =========================================================
 
 col1, col2, col3, col4 = st.columns(4, gap="medium")
 
@@ -1204,9 +1300,8 @@ with col4:
     )
 
 
-# =========================================================
+
 # 11. BUDGET HEALTH
-# =========================================================
 
 section_heading(
     "Budget health",
@@ -1253,9 +1348,7 @@ else:
 st.markdown("</div>", unsafe_allow_html=True)
 
 
-# =========================================================
 # 12. SPENDING INSIGHTS
-# =========================================================
 
 section_heading(
     "Spending insights",
@@ -1361,9 +1454,7 @@ with chart_right:
         )
 
 
-# =========================================================
 # 13. ADVANCED ANALYTICS
-# =========================================================
 
 section_heading(
     "Advanced analytics",
@@ -1491,9 +1582,7 @@ with analytics_right:
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-# =========================================================
 # 14. TRANSACTIONS
-# =========================================================
 
 section_heading(
     "Transactions",
@@ -1715,15 +1804,14 @@ else:
 
 
 
-# ============================================================
-# SECTION 15: SAVINGS GOALS
-# ============================================================
+
+# 15. SAVINGS GOALS
 
 st.divider()
 
 section_heading(
     "Savings Goals",
-    "Set a target, track your progress, and build better saving habits."
+    "Set a target, track your progress, and build better saving habits.",
 )
 
 goal_col1, goal_col2 = st.columns([0.9, 1.1], gap="large")
@@ -1735,21 +1823,21 @@ with goal_col1:
     with st.form("add_savings_goal_form", clear_on_submit=True):
         goal_name = st.text_input(
             "Goal name",
-            placeholder="e.g. New laptop"
+            placeholder="e.g. New laptop",
         )
 
         goal_target = st.number_input(
             "Target amount (Rs.)",
             min_value=1.0,
             value=10000.0,
-            step=500.0
+            step=500.0,
         )
 
         goal_saved = st.number_input(
             "Already saved (Rs.)",
             min_value=0.0,
             value=0.0,
-            step=500.0
+            step=500.0,
         )
 
         has_deadline = st.checkbox("Set a target date")
@@ -1760,60 +1848,55 @@ with goal_col1:
             goal_deadline = st.date_input(
                 "Target date",
                 value=date.today() + timedelta(days=30),
-                min_value=date.today()
+                min_value=date.today(),
             )
 
         create_goal = st.form_submit_button(
             "Create savings goal",
-            use_container_width=True
+            use_container_width=True,
         )
 
-if create_goal:
-    if not goal_name.strip():
-        st.error("Please enter a name for your goal.")
-
-    elif goal_target <= 0:
-        st.error("Target amount must be greater than zero.")
-
-    elif goal_saved < 0:
-        st.error("Saved amount cannot be negative.")
-
-    elif goal_saved > goal_target:
-        st.error(
-            "The amount already saved cannot exceed the target amount."
-        )
-
-    else:
-        deadline_value = (
-            goal_deadline.isoformat()
-            if goal_deadline is not None
-            else None
-        )
-
-        try:
-            created = add_savings_goal(
-                goal_name.strip(),
-                float(goal_target),
-                float(goal_saved),
-                deadline_value,
+    if create_goal:
+        if not goal_name.strip():
+            st.error("Please enter a name for your goal.")
+        elif goal_target <= 0:
+            st.error("Target amount must be greater than zero.")
+        elif goal_saved < 0:
+            st.error("Saved amount cannot be negative.")
+        elif goal_saved > goal_target:
+            st.error(
+                "The amount already saved cannot exceed the target amount."
+            )
+        else:
+            deadline_value = (
+                goal_deadline.isoformat()
+                if goal_deadline is not None
+                else ""
             )
 
-            if created:
-                st.success("Savings goal created successfully!")
-                st.rerun()
-            else:
-                st.warning(
-                    "An active goal with the same name and target amount "
-                    "already exists. Please update the existing goal instead."
+            try:
+                created = add_savings_goal(
+                    goal_name.strip(),
+                    float(goal_target),
+                    float(goal_saved),
+                    deadline_value,
                 )
 
-        except ValueError as error:
-            st.error(str(error))
+                if created:
+                    st.success("Savings goal created successfully!")
+                    st.rerun()
+                else:
+                    st.warning(
+                        "An active goal with the same name and target "
+                        "already exists. Update the existing goal instead."
+                    )
+            except (ValueError, OverflowError) as error:
+                st.error(str(error))
 
 
 # RIGHT COLUMN: VIEW AND MANAGE GOALS
 with goal_col2:
-    st.markdown("#### Your goals")
+    st.markdown("#### Your savings goals")
 
     goals_df = get_savings_goals()
 
@@ -1822,11 +1905,9 @@ with goal_col2:
             "You haven't created any savings goals yet. "
             "Create your first goal using the form."
         )
-
     else:
         goals_df = goals_df.copy()
 
-        # Handle missing values safely
         goals_df["deadline"] = (
             goals_df["deadline"]
             .fillna("")
@@ -1839,10 +1920,10 @@ with goal_col2:
             goal_name_value = str(goal["name"])
             target = float(goal["target_amount"])
             saved = float(goal["saved_amount"])
+            deadline = goal["deadline"]
 
             progress = min(saved / target, 1.0) if target > 0 else 0.0
-            remaining = max(target - saved, 0.0)
-            deadline = goal["deadline"]
+            remaining_goal = max(target - saved, 0.0)
 
             with st.container(border=True):
                 st.markdown(f"**{goal_name_value}**")
@@ -1852,20 +1933,14 @@ with goal_col2:
                 metric_col1, metric_col2 = st.columns(2)
 
                 with metric_col1:
-                    st.metric(
-                        "Saved",
-                        f"Rs. {saved:,.2f}"
-                    )
+                    st.metric("Saved", f"Rs. {saved:,.2f}")
 
                 with metric_col2:
-                    st.metric(
-                        "Target",
-                        f"Rs. {target:,.2f}"
-                    )
+                    st.metric("Target", f"Rs. {target:,.2f}")
 
                 st.caption(
                     f"{progress * 100:.1f}% completed · "
-                    f"Rs. {remaining:,.2f} remaining"
+                    f"Rs. {remaining_goal:,.2f} remaining"
                 )
 
                 if deadline and deadline.lower() != "nan":
@@ -1874,70 +1949,58 @@ with goal_col2:
                 if progress >= 1:
                     st.success("Goal completed!")
 
-                # Manage the existing goal
                 with st.expander("Manage goal"):
                     with st.form(f"update_goal_form_{goal_id}"):
                         updated_saved = st.number_input(
                             "Update amount saved (Rs.)",
                             min_value=0.0,
-                            value=saved,
+                            max_value=target,
+                            value=min(max(saved, 0.0), target),
                             step=500.0,
-                            key=f"saved_amount_{goal_id}"
+                            key=f"saved_amount_{goal_id}",
                         )
 
                         update_goal = st.form_submit_button(
                             "Update progress",
-                            use_container_width=True
+                            use_container_width=True,
                         )
 
-                        if update_goal:
-                            if updated_saved > target:
-                                st.error(
-                                    "Saved amount cannot exceed the target."
-                                )
-                            else:
-                                with sqlite3.connect(DB_PATH) as conn:
-                                    conn.execute(
-                                        """
-                                        UPDATE savings_goals
-                                        SET saved_amount = ?
-                                        WHERE id = ?
-                                        """,
-                                        (float(updated_saved), goal_id)
-                                    )
-
-                                st.success("Savings progress updated.")
-                                st.rerun()
+                    if update_goal:
+                        try:
+                            update_savings_progress(
+                                goal_id,
+                                updated_saved,
+                            )
+                            st.success("Savings progress updated.")
+                            st.rerun()
+                        except (ValueError, OverflowError) as error:
+                            st.error(str(error))
 
                     st.divider()
 
                     confirm_delete = st.checkbox(
                         "I want to delete this goal",
-                        key=f"confirm_delete_{goal_id}"
+                        key=f"confirm_delete_{goal_id}",
                     )
 
                     if st.button(
                         "Delete goal",
                         key=f"delete_goal_{goal_id}",
                         use_container_width=True,
-                        disabled=not confirm_delete
+                        disabled=not confirm_delete,
                     ):
-                        with sqlite3.connect(DB_PATH) as conn:
+                        with closing(get_connection()) as conn:
                             conn.execute(
-                                """
-                                DELETE FROM savings_goals
-                                WHERE id = ?
-                                """,
-                                (goal_id,)
+                                "DELETE FROM savings_goals WHERE id = ?",
+                                (goal_id,),
                             )
+                            conn.commit()
 
                         st.success("Savings goal deleted.")
                         st.rerun()
 
 
-# =========================================================
 # 16. FOOTER
-# =========================================================
 
 st.markdown(
     """

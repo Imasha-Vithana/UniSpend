@@ -3,6 +3,7 @@ import sqlite3
 from contextlib import closing
 from datetime import date, timedelta
 from pathlib import Path
+import os
 
 import pandas as pd
 import plotly.express as px
@@ -18,7 +19,12 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-DB_PATH = Path(__file__).resolve().parent / "unispends.db"
+DB_PATH = Path(
+    os.environ.get(
+        "UNISPEND_DB_PATH",
+        str(Path(__file__).resolve().parent / "unispends.db"),
+    )
+)
 
 CATEGORIES = [
     "Food & Drinks",
